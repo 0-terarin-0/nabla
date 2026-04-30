@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { save } from "@tauri-apps/plugin-dialog";
+import { writeFile } from "@tauri-apps/plugin-fs";
 
 export default function Home() {
   const [configText, setConfigText] = useState<string>("");
@@ -37,23 +39,27 @@ export default function Home() {
         isLoop: isLoop,
       });
 
-      // Convert number array to Uint8Array and create a Blob
+      // Convert number array to Uint8Array
       const uint8Array = Uint8Array.from(zipBytes);
-      const blob = new Blob([uint8Array], { type: "application/zip" });
 
-      // Create a temporary link to trigger download
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = isLoop ? "dispersion_results.zip" : "nominal_results.zip";
-      document.body.appendChild(a);
-      a.click();
+      // Prompt user to select a save location
+      const savePath = await save({
+        filters: [
+          {
+            name: "ZIP Archive",
+            extensions: ["zip"],
+          },
+        ],
+        defaultPath: isLoop ? "dispersion_results.zip" : "nominal_results.zip",
+      });
 
-      // Cleanup
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      setStatusMsg("Simulation finished successfully! ZIP downloaded.");
+      if (savePath) {
+        // Write the file to the selected path
+        await writeFile(savePath, uint8Array);
+        setStatusMsg(`Simulation finished successfully! Saved to ${savePath}`);
+      } else {
+        setStatusMsg("Simulation finished. Save cancelled by user.");
+      }
     } catch (err) {
       console.error("Simulation error:", err);
       setStatusMsg(`Error: ${err}`);
