@@ -1,0 +1,110 @@
+{
+    "Define Comment": {
+        "Default_Unit": "m_kg_sec",
+        "Fuel": "Fuel-Grain-Cartridge",
+        "Dry": "Liftoff - Oxidizer",
+        "C.G.": "Center of Gravity",
+        "C.P.": "Center of Pressure",
+        "LLH": "Latitude, Longitude, Height",
+        "Elevation": "Ground to Up _ 0deg 90deg",
+        "Azimuth": "North to East (clockwise) _ 0deg 360deg"
+    },
+    "Solver": {
+        "Name": "nichikagon",
+        "Result Filepath": "./Result_single_nichikagon_06/_00_config",
+        "Time Step [sec]": 0.01,
+        "Filepath": "config/config_251209.json"
+    },
+    "Multi Solver": {
+        "Minimum Wind Speed [m/s]": 0.0,
+        "Step Wind Speed [m/s]": 1.0,
+        "Number of Wind Speed": 9,
+        "Number of Wind Azimuth": 16,
+        "Base Wind Azimuth [deg]": 45
+    },
+    "Wind": {
+        "Wind File Exist": true,
+        "Wind File": "./Result_single_nichikagon_06/_00_config/nichikagon_wind.csv",
+        "__comment": "Wind Model : lawならべき法則　constantなら一定風速 multiモードなら自動でlawになる",
+        "Wind Model": "law",
+        "Wind Power Law Coefficient": 4.5,
+        "Wind Speed [m/s]": 1.0,
+        "Wind Azimuth [deg]": 0,
+        "Wind Reference Altitude [m]": 2.0
+    },
+    "Atmosphere": {
+        "Temperature at 0 m [℃]": 15.0
+    },
+    "Launch Condition": {
+        "Date": "2026/3/25 12:00:00.0",
+        "__comment1": "1:oshima_land , 2:oshima_sea, 3:noshiro_land, 4:noshiro_sea, 5:other",
+        "Site": "5",
+        "__comment2": "If Site = 5, please enter [Launch lat, Launch lon, Launch height]",
+        "Launch lat": 34.2852,
+        "Launch lon": 135.09059,
+        "Launch height": 90.0,
+        "Launch Azimuth [deg]": 315,
+        "Launch Elevation [deg]": 85.0,
+        "Launcher Rail Length [m]": 5.0,
+        "Tip-Off Calculation Exist": true,
+        "__comment3": "保安円を出力したいなら true いらないなら false",
+        "__comment4": "各射場の射点情報や保安域の情報はinput/launch_site.jsonに記述されているので，そこをいじる。",
+        "Safety Area Exist": true,
+        "__comment5": "If you don't consider magnetic azimuth, please enter 0.0",
+        "__comment6": "運営から配られたもの使ってください",
+        "Input Magnetic Azimuth [deg]": 7.4
+    },
+    "Structure": {
+        "Length [m]": 1.32,
+        "Diameter [m]": 0.114,
+        "Dry Mass [kg]": 6.138,
+        "Dry Length-C.G. from Nosetip [m]": 0.54,
+        "Dry Moment of Inertia Roll-Axis [kg*m^2]": 0.009,
+        "Dry Moment of Inertia  Pitch-Axis [kg*m^2]": 1.042,
+        "Upper Launch Lug [m]": 0.39,
+        "Lower Launch Lug [m]": 1.3
+    },
+    "Engine": {
+        "Thrust Curve": "./Result_single_nichikagon_06/_00_config/nichikagon_thrust.csv",
+        "Nozzle Exit Diameter [mm]": 10.0,
+        "Burn Time [sec]": 2.09,
+        "Tank Volume [cc]": 300,
+        "Oxidizer Density [kg/m^3]": 0.913,
+        "Length Fuel-C.G. from End [m]": 0.136,
+        "Length Tank-End from End [m]": 0.273,
+        "Fuel Mass Before [kg]": 0.38,
+        "Fuel Mass After [kg]": 0.352,
+        "Fuel Outside Diameter [mm]": 44.0,
+        "Fuel Inside Diameter [mm]": 22.8,
+        "Tank Diameter [mm]": 54.0,
+        "Fuel Length [m]": 0.273,
+        "Tank Length [m]": 0.273
+    },
+    "Parachute": {
+        "1st Parachute CdS [m2]": 1.34,
+        "Parachute Opening Lag [sec]": 0.5,
+        "2nd Parachute Exist": false,
+        "2nd Parachute CdS [m2]": 0.6306,
+        "2nd Parachute Opening Altitude [m]": 300,
+        "2nd Parachute Timer Mode": false,
+        "2nd Timer [s]": 20.0
+    },
+    "Aero": {
+        "Cd File": "",
+        "Cd File Exist": false,
+        "Constant Cd": 0.41,
+        "Length-C.P. File": "",
+        "Length-C.P. File Exist": false,
+        "Constant Length-C.P. from Nosetip [m]": 0.78,
+        "CNa File": "",
+        "CNa File Exist": false,
+        "Constant CNa": 5.436,
+        "Roll Dumping Moment Coefficient Clp": -0.0296,
+        "Pitch Dumping Moment Coefficient Cmq": -2.11
+    },
+    "Payload": {
+        "Payload Exist": false,
+        "Mass [kg]": 1.0,
+        "Parachute CdS [m2]": 0.12
+    }
+}

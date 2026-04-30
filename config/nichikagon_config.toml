@@ -1,0 +1,71 @@
+[Solver]
+name = "nichikagon"
+dt = 0.01
+t_max = 1000.0
+
+[MonteCarlo]
+speed_min = 0.0
+speed_step = 1.0
+speed_num = 9
+azimuth_min = 45.0
+azimuth_num = 16
+
+[Launcher]
+lat = 34.2852
+lon = 135.09059
+height = 90.0
+mag_dec = 7.4
+launch_elevation = 85.0
+launch_azimuth = 315.0
+rail_length = 5.0
+
+[Wind]
+wind_speed = 1.0
+wind_azimuth = 0.0
+wind_power_coeff = 4.5
+wind_alt_ref = 2.0
+exist_wind_file = true
+wind_file = "config/nichikagon_wind.csv"
+
+[Geometry]
+diameter = 114.0
+length = 1320.0
+mass_dry = 6.138
+lcg_dry = 780.0
+Ij_dry_roll = 0.009
+Ij_dry_pitch = 1.042
+
+[Aerodynamics]
+lcp = 540.0
+CA = 0.41
+CNa = 5.436
+Clp = -0.0296
+Cmq = -2.11
+exsist_lcp_file = false
+exsist_CA_file = false
+exsist_CNa_file = false
+lcp_file = ""
+CA_file = ""
+CNa_file = ""
+
+[Engine]
+mass_ox = 0.2739
+mass_fuel_bef = 0.38
+mass_fuel_aft = 0.352
+lcg_ox = 136.5
+lcg_fuel = 136.0
+l_tank_cap = 273.0
+thrust_file = "config/nichikagon_thrust.csv"
+
+[Parachute]
+vel_para_1st = 8.805970788912555
+exist_2nd_para = false
+vel_para_2nd = 12.836678269815902
+2nd_para_timer = false
+alt_para_2nd = 300.0
+time_2nd = 20.0
+
+[Payload]
+exist_payload = false
+mass_payload = 1.0
+vel_payload = 11.55092245337183

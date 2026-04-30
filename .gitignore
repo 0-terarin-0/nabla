@@ -1,0 +1,5 @@
+/target
+/miniQuabla
+/venv
+*.csv
+*.kml
