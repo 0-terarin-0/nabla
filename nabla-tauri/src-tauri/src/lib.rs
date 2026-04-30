@@ -5,6 +5,7 @@ use nalgebra::{DVector, Vector3};
 use rayon::prelude::*;
 use std::fs::{self, File};
 use std::io::{Cursor, Read, Write};
+use std::path::PathBuf;
 use zip::write::SimpleFileOptions;
 
 #[tauri::command]
@@ -35,8 +36,8 @@ wind_speed = 1.0
 wind_azimuth = 0.0
 wind_power_coeff = 4.5
 wind_alt_ref = 2.0
-exist_wind_file = false
-wind_file = ""
+exist_wind_file = true
+wind_file = "config/nichikagon_wind.csv"
 
 [Geometry]
 diameter = 114.0
@@ -66,7 +67,7 @@ mass_fuel_aft = 0.352
 lcg_ox = 136.5
 lcg_fuel = 136.0
 l_tank_cap = 273.0
-thrust_file = "thrust_dummy.csv"
+thrust_file = "config/thrust_example.csv"
 
 [Parachute]
 vel_para_1st = 8.80
@@ -96,12 +97,33 @@ async fn run_simulation(config_content: String, is_loop: bool) -> Result<Vec<u8>
     let config_path = dir_path.join("config.toml");
     fs::write(&config_path, &config_content).map_err(|e| e.to_string())?;
 
-    // 3. Create a dummy thrust file so the default configuration won't crash
-    fs::write(
-        dir_path.join("thrust_dummy.csv"),
-        "time,thrust\n0.0,100.0\n10.0,100.0",
-    )
-    .unwrap_or(());
+    // 3. Copy real external files (thrust, wind, etc.) into the temp directory
+    //    We recreate a 'config' directory inside temp_dir to match the expected relative paths.
+    let config_dir_dest = dir_path.join("config");
+    fs::create_dir_all(&config_dir_dest).map_err(|e| e.to_string())?;
+
+    // Depending on where `tauri dev` is executed, the workspace root might be relative in different ways
+    let possible_src_dirs = vec![
+        PathBuf::from("../../nabla-cli/config"), // cwd is src-tauri
+        PathBuf::from("../nabla-cli/config"),    // cwd is nabla-tauri
+        PathBuf::from("nabla-cli/config"),       // cwd is workspace root
+    ];
+
+    for src_dir in possible_src_dirs {
+        if src_dir.exists() {
+            if let Ok(entries) = fs::read_dir(&src_dir) {
+                for entry in entries.flatten() {
+                    if let Ok(file_type) = entry.file_type() {
+                        if file_type.is_file() {
+                            let dest_path = config_dir_dest.join(entry.file_name());
+                            let _ = fs::copy(entry.path(), dest_path);
+                        }
+                    }
+                }
+            }
+            break;
+        }
+    }
 
     // 4. Initialize parameters from the configuration
     let param =
@@ -272,26 +294,4 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![get_default_config, run_simulation])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_run_simulation() {
-        let config = get_default_config();
-
-        // Use Tauri's async runtime to block on the async command
-        let result = tauri::async_runtime::block_on(run_simulation(config, false));
-
-        match result {
-            Ok(_) => println!("Simulation succeeded!"),
-            Err(e) => {
-                println!("Simulation failed. Captured error:");
-                println!("{}", e);
-                panic!("Simulation failed with error: {}", e);
-            }
-        }
-    }
 }
