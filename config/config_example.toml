@@ -55,7 +55,7 @@ mass_fuel_aft = 0.352
 lcg_ox = 136.5
 lcg_fuel = 136.0
 l_tank_cap = 273.0
-thrust_file = "config/nichikagon_thrust.csv"
+thrust_file = "config/thrust_example.csv"
 
 [Parachute]
 vel_para_1st = 8.805970788912555

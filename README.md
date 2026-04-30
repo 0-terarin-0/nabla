@@ -18,7 +18,7 @@
 Rust のツールチェーン（`cargo`）がインストールされている必要があります。
 
 ```bash
-git clone <this_repository>
+git clone https://github.com/0-terarin-0/nabla
 cd nabla
 cargo build --release
 ```
@@ -31,12 +31,12 @@ cargo build --release
 （引数を省略した場合は、デフォルトで `miniQuabla/example/rocket_config.csv` が読み込まれます）
 
 ```bash
-cargo run --release -- config/nichikagon_config.toml
+cargo run --release -- config/config_example.toml
 ```
 
 **実行結果の例:**
 ```text
-Loading configuration from config/nichikagon_config.toml ...
+Loading configuration from config/config_example.toml ...
 
 Calculating trajectory...
 -> Apogee reached: 219.94 m at 7.46 s
@@ -55,7 +55,7 @@ Total Calculation Time : 1.42ms
 `--loop` オプションを付与することで、設定ファイル内で指定された風速・風向の組み合わせ（分散条件）をすべて並列計算します。
 
 ```bash
-cargo run --release -- config/nichikagon_config.toml --loop
+cargo run --release -- config/config_example.toml --loop
 ```
 
 **実行結果の例:**
@@ -79,7 +79,7 @@ Loop Simulation Time : 155.25ms
 
 TOML形式の設定ファイルは、見やすくするために任意のセクション（例：`[Geometry]`, `[Engine]`, `[Parachute]`）に分けて記述することができます。プログラム内部で自動的にフラット化されて読み込まれるため、セクションの名前や分け方は自由に変更可能です。
 
-設定例は `config/nichikagon_config.toml` などを参照してください。
+設定例は `config/config_example.toml` などを参照してください。
 
 ## License
 
