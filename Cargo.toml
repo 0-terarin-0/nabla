@@ -1,21 +1,5 @@
-[package]
-name = "nabla"
-version = "0.1.0"
-edition = "2024"
-license = "MIT"
-description = "A fast rocket flight simulator ported from miniQuabla to Rust"
-
-[lib]
-name = "nabla"
-path = "src/lib.rs"
-
-[dependencies]
-csv = "1.4.0"
-nalgebra = "0.34.2"
-serde = { version = "1.0.228", features = ["derive"] }
-anyhow = "1.0"
-ode_solvers = "0.3"
-serde_json = "1.0.149"
-rayon = "1.12.0"
-quick-xml = "0.39.2"
-toml = "1.1.2"
+[workspace]
+members = [
+    "nabla-core",
+    "nabla-cli",
+]

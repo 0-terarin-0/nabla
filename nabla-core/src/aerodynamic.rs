@@ -63,7 +63,7 @@ pub struct Aerodynamic {
 }
 
 impl Aerodynamic {
-    pub fn new(config: &AerodynamicConfig) -> anyhow::Result<Self> {
+    pub fn new(config: &AerodynamicConfig, base_dir: &Path) -> anyhow::Result<Self> {
         let mut coeff_mq = config.cmq;
         if coeff_mq > 0.0 {
             coeff_mq *= -1.0;
@@ -73,9 +73,10 @@ impl Aerodynamic {
         let mach_array_const: Vec<f64> = (0..80).map(|i| i as f64 * 20.0 / 79.0).collect();
 
         let (mach_lcp, lcp_array) = if config.exist_lcp_file {
+            let lcp_file_path = base_dir.join(&config.lcp_file);
             let mut rdr = csv::ReaderBuilder::new()
                 .has_headers(true)
-                .from_path(Path::new(&config.lcp_file))?;
+                .from_path(lcp_file_path)?;
             let mut machs = Vec::new();
             let mut lcps = Vec::new();
             for result in rdr.records() {
@@ -92,9 +93,10 @@ impl Aerodynamic {
         };
 
         let (mach_ca, ca_array) = if config.exist_ca_file {
+            let ca_file_path = base_dir.join(&config.ca_file);
             let mut rdr = csv::ReaderBuilder::new()
                 .has_headers(true)
-                .from_path(Path::new(&config.ca_file))?;
+                .from_path(ca_file_path)?;
             let mut machs = Vec::new();
             let mut cas = Vec::new();
             for result in rdr.records() {
@@ -111,9 +113,10 @@ impl Aerodynamic {
         };
 
         let (mach_cna, cna_array) = if config.exist_cna_file {
+            let cna_file_path = base_dir.join(&config.cna_file);
             let mut rdr = csv::ReaderBuilder::new()
                 .has_headers(true)
-                .from_path(Path::new(&config.cna_file))?;
+                .from_path(cna_file_path)?;
             let mut machs = Vec::new();
             let mut cnas = Vec::new();
             for result in rdr.records() {

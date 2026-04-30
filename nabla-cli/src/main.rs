@@ -1,7 +1,7 @@
 use anyhow::Result;
-use nabla::parameter::Parameter;
-use nabla::post_process::{export_csv, export_kml};
-use nabla::solver::{solve_parachute, solve_trajectory};
+use nabla_core::parameter::Parameter;
+use nabla_core::post_process::{export_csv, export_kml, export_loop_kml};
+use nabla_core::solver::{solve_parachute, solve_trajectory};
 use nalgebra::{DVector, Vector3};
 use rayon::prelude::*;
 use std::env;
@@ -15,7 +15,7 @@ fn main() -> Result<()> {
     let config_path = args
         .get(1)
         .map(String::as_str)
-        .unwrap_or("miniQuabla/example/rocket_config.csv");
+        .unwrap_or("config/config_example.toml");
     if !Path::new(config_path).exists() {
         eprintln!("Configuration file not found: {}", config_path);
         eprintln!("Please run this command from the nabla project root.");
@@ -91,14 +91,14 @@ fn main() -> Result<()> {
         }
 
         // KMLファイルに出力して落下分散を確認できるようにする
-        nabla::post_process::export_loop_kml(
+        export_loop_kml(
             "land_map_trajectory.kml",
             &param.launch.llh,
             &pos_hard_matrix,
             &speeds,
             "ff00aaff",
         )?;
-        nabla::post_process::export_loop_kml(
+        export_loop_kml(
             "land_map_parachute.kml",
             &param.launch.llh,
             &pos_soft_matrix,

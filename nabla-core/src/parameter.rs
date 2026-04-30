@@ -39,6 +39,8 @@ pub struct Parameter {
 
 impl Parameter {
     pub fn new<P: AsRef<Path>>(path_config: P) -> anyhow::Result<Self> {
+        let path_config = path_config.as_ref();
+        let base_dir = path_config.parent().unwrap_or_else(|| Path::new(""));
         let raw_config = Self::read_config(path_config)?;
         let json_value = Self::allocate_df(&raw_config)?;
 
@@ -52,9 +54,10 @@ impl Parameter {
         let para_cfg: ParachuteConfig = serde_json::from_value(json_value["Parachute"].clone())?;
         let payload_cfg: PayloadConfig = serde_json::from_value(json_value["Payload"].clone())?;
 
-        let aero = Aerodynamic::new(&aero_cfg).context("Failed to initialize Aerodynamic")?;
+        let aero =
+            Aerodynamic::new(&aero_cfg, base_dir).context("Failed to initialize Aerodynamic")?;
         let atmos = Atmosphere::new();
-        let engine = Engine::new(&engine_cfg).context("Failed to initialize Engine")?;
+        let engine = Engine::new(&engine_cfg, base_dir).context("Failed to initialize Engine")?;
         let geomet = Geometry::new(&geomet_cfg, &engine);
         let launch = Launcher::new(&launch_cfg);
         let wind = Wind::new(&wind_cfg, launch_cfg.mag_dec);

@@ -29,13 +29,15 @@ pub struct Engine {
 }
 
 impl Engine {
-    pub fn new(config: &EngineConfig) -> anyhow::Result<Self> {
+    pub fn new(config: &EngineConfig, base_dir: &Path) -> anyhow::Result<Self> {
         let delta_fuel = config.mass_fuel_bef - config.mass_fuel_aft;
         let l_tank = 2.0 * (config.l_tank_cap - config.lcg_ox).abs();
 
+        let thrust_file_path = base_dir.join(&config.thrust_file);
+
         let mut rdr = csv::ReaderBuilder::new()
             .has_headers(true)
-            .from_path(Path::new(&config.thrust_file))?;
+            .from_path(thrust_file_path)?;
 
         let mut time_array = Vec::new();
         let mut thrust_array = Vec::new();
