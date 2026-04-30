@@ -84,8 +84,18 @@ vel_payload = 11.55"#
         .to_string()
 }
 
+#[derive(serde::Deserialize)]
+pub struct ExtraFile {
+    name: String,
+    content: String,
+}
+
 #[tauri::command]
-async fn run_simulation(config_content: String, is_loop: bool) -> Result<Vec<u8>, String> {
+async fn run_simulation(
+    config_content: String,
+    is_loop: bool,
+    extra_files: Vec<ExtraFile>,
+) -> Result<Vec<u8>, String> {
     // 1. Create a temporary directory for this simulation run
     let temp_dir = tempfile::Builder::new()
         .prefix("nabla_sim")
@@ -123,6 +133,15 @@ async fn run_simulation(config_content: String, is_loop: bool) -> Result<Vec<u8>
             }
             break;
         }
+    }
+
+    // Write extra files provided by the user from the frontend
+    for file in extra_files {
+        let file_path = dir_path.join(&file.name);
+        if let Some(parent) = file_path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        let _ = fs::write(file_path, file.content);
     }
 
     // 4. Initialize parameters from the configuration
