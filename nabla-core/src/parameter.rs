@@ -231,10 +231,7 @@ impl Parameter {
             .and_then(|s| s.parse::<f64>().ok())
             .unwrap_or(0.0)
             * 1.0e-3;
-        let mut thrust_file = config_src.get("thrust_file").cloned().unwrap_or_default();
-        if !thrust_file.is_empty() && !Path::new(&thrust_file).exists() {
-            thrust_file = format!("miniQuabla/{}", thrust_file);
-        }
+        let thrust_file = config_src.get("thrust_file").cloned().unwrap_or_default();
 
         let engine_json = json!({
             "mass_ox": mass_ox,
@@ -271,18 +268,9 @@ impl Parameter {
         let exist_lcp_file = Self::parse_bool(config_src.get("exsist_lcp_file"));
         let exist_ca_file = Self::parse_bool(config_src.get("exsist_CA_file"));
         let exist_cna_file = Self::parse_bool(config_src.get("exsist_CNa_file"));
-        let mut lcp_file = config_src.get("lcp_file").cloned().unwrap_or_default();
-        if !lcp_file.is_empty() && !Path::new(&lcp_file).exists() {
-            lcp_file = format!("miniQuabla/{}", lcp_file);
-        }
-        let mut ca_file = config_src.get("CA_file").cloned().unwrap_or_default();
-        if !ca_file.is_empty() && !Path::new(&ca_file).exists() {
-            ca_file = format!("miniQuabla/{}", ca_file);
-        }
-        let mut cna_file = config_src.get("CNa_file").cloned().unwrap_or_default();
-        if !cna_file.is_empty() && !Path::new(&cna_file).exists() {
-            cna_file = format!("miniQuabla/{}", cna_file);
-        }
+        let lcp_file = config_src.get("lcp_file").cloned().unwrap_or_default();
+        let ca_file = config_src.get("CA_file").cloned().unwrap_or_default();
+        let cna_file = config_src.get("CNa_file").cloned().unwrap_or_default();
 
         let aero_json = json!({
             "lcp": lcp,
@@ -316,10 +304,7 @@ impl Parameter {
             .and_then(|s| s.parse::<f64>().ok())
             .unwrap_or(0.0);
         let exist_file = Self::parse_bool(config_src.get("exist_wind_file"));
-        let mut file = config_src.get("wind_file").cloned().unwrap_or_default();
-        if !file.is_empty() && !Path::new(&file).exists() {
-            file = format!("miniQuabla/{}", file);
-        }
+        let file = config_src.get("wind_file").cloned().unwrap_or_default();
 
         let wind_json = json!({
             "speed": speed,
