@@ -80,8 +80,27 @@ time_2nd = 20.0
 [Payload]
 exist_payload = false
 mass_payload = 1.0
-vel_payload = 11.55"#
-        .to_string()
+vel_payload = 11.55
+
+[SafetyArea]
+coordinates = [
+    [34.285604, 135.093313],
+    [34.285698, 135.092503],
+    [34.286411, 135.092401],
+    [34.286863, 135.091339],
+    [34.287492, 135.089311],
+    [34.286140, 135.088726],
+    [34.286634, 135.087086],
+    [34.283611, 135.087193],
+    [34.283675, 135.088155],
+    [34.283486, 135.088878],
+    [34.282289, 135.090412],
+    [34.282672, 135.090973],
+    [34.282842, 135.091651],
+    [34.283453, 135.092365],
+    [34.284049, 135.092649]
+]"#
+    .to_string()
 }
 
 #[derive(serde::Deserialize)]
@@ -90,12 +109,20 @@ pub struct ExtraFile {
     content: String,
 }
 
+#[derive(serde::Serialize)]
+pub struct SimulationResult {
+    zip_bytes: Vec<u8>,
+    kml_files: std::collections::HashMap<String, String>,
+    launch_pos: (f64, f64),
+    safety_area: Vec<Vec<f64>>,
+}
+
 #[tauri::command]
 async fn run_simulation(
     config_content: String,
     is_loop: bool,
     extra_files: Vec<ExtraFile>,
-) -> Result<Vec<u8>, String> {
+) -> Result<SimulationResult, String> {
     // 1. Create a temporary directory for this simulation run
     let temp_dir = tempfile::Builder::new()
         .prefix("nabla_sim")
@@ -275,8 +302,9 @@ async fn run_simulation(
         .map_err(|e| e.to_string())?;
     }
 
-    // 6. Zip all generated files (.csv and .kml)
+    // 6. Zip all generated output files (.csv and .kml)
     let mut buf = Vec::new();
+    let mut kml_files = std::collections::HashMap::new();
     {
         let cursor = Cursor::new(&mut buf);
         let mut zip = zip::ZipWriter::new(cursor);
@@ -288,20 +316,65 @@ async fn run_simulation(
             let entry = entry.map_err(|e| e.to_string())?;
             let path = entry.path();
             if path.is_file() {
-                let name = path.file_name().unwrap().to_string_lossy();
-                if name.ends_with(".csv") || name.ends_with(".kml") {
-                    zip.start_file(name, options).map_err(|e| e.to_string())?;
+                let name = path.file_name().unwrap().to_string_lossy().to_string();
+                // Avoid zipping the config.toml and the copied reference csvs like thrust_example.csv
+                if name.ends_with("_log.csv") || name.ends_with(".kml") {
+                    zip.start_file(name.clone(), options)
+                        .map_err(|e| e.to_string())?;
                     let mut f = File::open(&path).map_err(|e| e.to_string())?;
                     let mut file_buf = Vec::new();
                     f.read_to_end(&mut file_buf).map_err(|e| e.to_string())?;
                     zip.write_all(&file_buf).map_err(|e| e.to_string())?;
+
+                    if name.ends_with(".kml") {
+                        if let Ok(content) = String::from_utf8(file_buf) {
+                            kml_files.insert(name, content);
+                        }
+                    }
                 }
             }
         }
         zip.finish().map_err(|e| e.to_string())?;
     }
 
-    Ok(buf)
+    let launch_pos = (param.launch.llh[0], param.launch.llh[1]);
+
+    let mut safety_area = Vec::new();
+    let mut in_safety_area = false;
+    for line in config_content.lines() {
+        let line = line.trim();
+        if line.starts_with("[SafetyArea]") {
+            in_safety_area = true;
+            continue;
+        } else if line.starts_with('[') && !line.contains(',') && in_safety_area {
+            in_safety_area = false;
+        }
+
+        if in_safety_area {
+            if let Some(start) = line.find('[') {
+                if let Some(end) = line.find(']') {
+                    if start < end {
+                        let inner = &line[start + 1..end];
+                        let parts: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
+                        if parts.len() == 2 {
+                            if let (Ok(lat), Ok(lon)) =
+                                (parts[0].parse::<f64>(), parts[1].parse::<f64>())
+                            {
+                                safety_area.push(vec![lat, lon]);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(SimulationResult {
+        zip_bytes: buf,
+        kml_files,
+        launch_pos,
+        safety_area,
+    })
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

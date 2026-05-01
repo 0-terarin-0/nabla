@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import dynamic from "next/dynamic";
 import { invoke } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeFile } from "@tauri-apps/plugin-fs";
@@ -14,6 +15,8 @@ import {
   FileSpreadsheet,
   Sun,
   Moon,
+  Map as MapIcon,
+  Code,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -27,10 +30,28 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+// Dynamically import MapViewer to avoid SSR issues with Leaflet
+const MapViewer = dynamic(() => import("@/components/MapViewer"), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-full flex items-center justify-center bg-muted/20 text-muted-foreground animate-pulse">
+      Loading map...
+    </div>
+  ),
+});
 
 interface ExtraFile {
   name: string;
   content: string;
+}
+
+interface SimulationResult {
+  zip_bytes: number[];
+  kml_files: Record<string, string>;
+  launch_pos: [number, number];
+  safety_area: [number, number][];
 }
 
 export default function Home() {
@@ -39,6 +60,10 @@ export default function Home() {
   const [statusMsg, setStatusMsg] = useState<string>("System ready.");
   const [isError, setIsError] = useState<boolean>(false);
   const [extraFiles, setExtraFiles] = useState<ExtraFile[]>([]);
+  const [kmlData, setKmlData] = useState<Record<string, string>>({});
+  const [launchPos, setLaunchPos] = useState<[number, number] | null>(null);
+  const [safetyArea, setSafetyArea] = useState<[number, number][]>([]);
+  const [activeTab, setActiveTab] = useState<string>("editor");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { theme, setTheme } = useTheme();
@@ -87,7 +112,7 @@ export default function Home() {
     setExtraFiles((prev) => prev.filter((f) => f.name !== nameToRemove));
   };
 
-  // Handle simulation execution and ZIP download
+  // Handle simulation execution, map rendering, and ZIP download
   const runSimulation = async (isLoop: boolean) => {
     setIsSimulating(true);
     setIsError(false);
@@ -97,14 +122,24 @@ export default function Home() {
 
     try {
       // Invoke Rust backend
-      const zipBytes = await invoke<number[]>("run_simulation", {
+      const result = await invoke<SimulationResult>("run_simulation", {
         configContent: configText,
         isLoop: isLoop,
         extraFiles: extraFiles,
       });
 
+      // Set KML data and launch pos for map rendering and switch tab
+      if (result.kml_files && Object.keys(result.kml_files).length > 0) {
+        setKmlData(result.kml_files);
+        setLaunchPos(result.launch_pos);
+        setSafetyArea(result.safety_area || []);
+        setActiveTab("map");
+      }
+
       setStatusMsg("Simulation finished.\nWaiting for save location...");
-      const uint8Array = Uint8Array.from(zipBytes);
+
+      // Convert number array to Uint8Array for ZIP download
+      const uint8Array = Uint8Array.from(result.zip_bytes);
 
       // Prompt user to select a save location
       const savePath = await save({
@@ -134,119 +169,171 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-background text-foreground p-4 md:p-8 flex flex-col items-center justify-center relative transition-colors duration-300">
-      {/* Theme Toggle */}
-      {mounted && (
-        <Button
-          variant="outline"
-          size="icon"
-          className="absolute top-4 right-4 rounded-full"
-          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-        >
-          {theme === "dark" ? (
-            <Sun className="h-5 w-5" />
-          ) : (
-            <Moon className="h-5 w-5" />
-          )}
-          <span className="sr-only">Toggle theme</span>
-        </Button>
-      )}
+    <main className="h-screen w-screen bg-background text-foreground p-3 flex flex-col items-center justify-center relative transition-colors duration-300 overflow-hidden">
+      <div className="w-full max-w-[120rem] grid grid-cols-1 xl:grid-cols-4 gap-4 h-full">
+        {/* Left Column: Tabs (Editor / Map) */}
+        <div className="xl:col-span-3 flex flex-col min-h-0 overflow-hidden">
+          <Tabs
+            value={activeTab}
+            onValueChange={setActiveTab}
+            className="flex-1 flex flex-col min-h-0 overflow-hidden"
+          >
+            <TabsList className="grid w-full grid-cols-2 mb-2 bg-muted/50 p-1">
+              <TabsTrigger
+                value="editor"
+                className="flex items-center gap-2 font-medium"
+              >
+                <Code className="w-4 h-4" />
+                Configuration
+              </TabsTrigger>
+              <TabsTrigger
+                value="map"
+                className="flex items-center gap-2 font-medium"
+              >
+                <MapIcon className="w-4 h-4" />
+                Flight Map
+              </TabsTrigger>
+            </TabsList>
 
-      <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-3 gap-6 h-[90vh]">
-        {/* Left Column: TOML Editor & Extra Files */}
-        <div className="lg:col-span-2 flex flex-col gap-6 overflow-hidden">
-          {/* TOML Editor */}
-          <Card className="flex-1 flex flex-col shadow-sm overflow-hidden min-h-0 bg-card border-border">
-            <CardHeader className="bg-muted/30 border-b border-border pb-4 shrink-0">
-              <CardTitle className="flex items-center gap-2 text-lg tracking-tight">
-                <Settings2 className="w-5 h-5 text-muted-foreground" />
-                Configuration Editor
-              </CardTitle>
-              <CardDescription>
-                Edit your rocket simulation parameters in TOML format.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex-1 p-0 overflow-hidden">
-              <Textarea
-                className="w-full h-full font-mono text-sm border-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none p-6 resize-none bg-transparent text-foreground"
-                value={configText}
-                onChange={(e) => setConfigText(e.target.value)}
-                spellCheck={false}
-                disabled={isSimulating}
-              />
-            </CardContent>
-          </Card>
-
-          {/* External CSV Files Upload */}
-          <Card className="shrink-0 shadow-sm bg-card border-border">
-            <CardHeader className="bg-muted/30 border-b border-border py-3 px-6">
-              <div className="flex justify-between items-center">
-                <CardTitle className="flex items-center gap-2 text-sm font-bold tracking-tight">
-                  <FileSpreadsheet className="w-4 h-4 text-muted-foreground" />
-                  External Files (CSV)
-                </CardTitle>
-                <div>
-                  <input
-                    type="file"
-                    multiple
-                    accept=".csv"
-                    className="hidden"
-                    ref={fileInputRef}
-                    onChange={handleFileUpload}
-                  />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 gap-1.5 text-xs"
-                    onClick={() => fileInputRef.current?.click()}
+            <TabsContent
+              value="editor"
+              className="flex-1 flex flex-col min-h-0 overflow-hidden gap-4 m-0 data-[state=active]:flex"
+            >
+              {/* TOML Editor */}
+              <Card className="flex-1 flex flex-col shadow-sm overflow-hidden min-h-0 bg-card border-border">
+                <CardHeader className="bg-muted/30 border-b border-border pb-3 shrink-0">
+                  <CardTitle className="flex items-center gap-2 text-lg tracking-tight">
+                    <Settings2 className="w-5 h-5 text-muted-foreground" />
+                    Editor
+                  </CardTitle>
+                  <CardDescription>
+                    Edit your rocket simulation parameters in TOML format.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex-1 p-0 overflow-hidden relative">
+                  <Textarea
+                    className="absolute inset-0 w-full h-full font-mono text-sm border-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none p-6 resize-none bg-transparent text-foreground"
+                    value={configText}
+                    onChange={(e) => setConfigText(e.target.value)}
+                    spellCheck={false}
                     disabled={isSimulating}
-                  >
-                    <Upload className="w-3.5 h-3.5" />
-                    Add CSVs
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="p-4">
-              {extraFiles.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-2 italic">
-                  No external files added. Upload thrust or aerodynamics data
-                  here.
-                </p>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {extraFiles.map((file) => (
-                    <Badge
-                      key={file.name}
-                      variant="secondary"
-                      className="px-2 py-1 pr-1 flex items-center gap-1 font-medium"
-                    >
-                      <FileSpreadsheet className="w-3 h-3 text-muted-foreground" />
-                      {file.name}
-                      <button
-                        onClick={() => removeFile(file.name)}
-                        className="ml-1 rounded-full p-0.5 hover:bg-muted-foreground/20 transition-colors"
+                  />
+                </CardContent>
+              </Card>
+
+              {/* External CSV Files Upload */}
+              <Card className="shrink-0 shadow-sm bg-card border-border">
+                <CardHeader className="bg-muted/30 border-b border-border py-3 px-4">
+                  <div className="flex justify-between items-center">
+                    <CardTitle className="flex items-center gap-2 text-sm font-bold tracking-tight">
+                      <FileSpreadsheet className="w-4 h-4 text-muted-foreground" />
+                      External Files (CSV)
+                    </CardTitle>
+                    <div>
+                      <input
+                        type="file"
+                        multiple
+                        accept=".csv"
+                        className="hidden"
+                        ref={fileInputRef}
+                        onChange={handleFileUpload}
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1.5 text-xs bg-background"
+                        onClick={() => fileInputRef.current?.click()}
                         disabled={isSimulating}
-                        title="Remove file"
                       >
-                        <X className="w-3 h-3 text-muted-foreground" />
-                      </button>
-                    </Badge>
-                  ))}
+                        <Upload className="w-3.5 h-3.5" />
+                        Add CSVs
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-3 min-h-[4rem] flex items-center">
+                  {extraFiles.length === 0 ? (
+                    <p className="text-sm text-muted-foreground italic text-center w-full">
+                      No external files added.
+                    </p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {extraFiles.map((file) => (
+                        <Badge
+                          key={file.name}
+                          variant="secondary"
+                          className="px-2 py-1 pr-1 flex items-center gap-1 font-medium"
+                        >
+                          <FileSpreadsheet className="w-3 h-3 text-muted-foreground" />
+                          {file.name}
+                          <button
+                            onClick={() => removeFile(file.name)}
+                            className="ml-1 rounded-full p-0.5 hover:bg-muted-foreground/20 transition-colors"
+                            disabled={isSimulating}
+                            title="Remove file"
+                          >
+                            <X className="w-3 h-3 text-muted-foreground" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent
+              value="map"
+              className="flex-1 flex flex-col min-h-0 m-0 data-[state=active]:flex"
+            >
+              <Card className="flex-1 shadow-sm border-border bg-card overflow-hidden">
+                <div className="w-full h-full relative">
+                  {Object.keys(kmlData).length > 0 ? (
+                    <MapViewer
+                      kmlData={kmlData}
+                      launchPos={launchPos}
+                      safetyArea={safetyArea}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground bg-muted/10">
+                      <MapIcon className="w-12 h-12 mb-4 text-muted-foreground/30" />
+                      <p>No map data available.</p>
+                      <p className="text-sm">
+                        Run a simulation to view the trajectory.
+                      </p>
+                    </div>
+                  )}
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
 
         {/* Right Column: Controls & Log */}
         <Card className="flex flex-col shadow-sm bg-card border-border overflow-hidden h-full">
-          <CardHeader className="bg-muted/30 border-b border-border pb-4 shrink-0">
-            <CardTitle className="flex items-center gap-2 text-lg tracking-tight">
-              <Rocket className="w-5 h-5 text-primary" />
-              Nabla Simulator
-            </CardTitle>
-            <CardDescription>Execution & Results</CardDescription>
+          <CardHeader className="bg-muted/30 border-b border-border pb-4 shrink-0 flex flex-row items-start justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-lg tracking-tight">
+                <Rocket className="w-5 h-5 text-primary" />
+                Nabla Simulator
+              </CardTitle>
+              <CardDescription>Execution & Results</CardDescription>
+            </div>
+            {mounted && (
+              <Button
+                variant="outline"
+                size="icon"
+                className="rounded-full"
+                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              >
+                {theme === "dark" ? (
+                  <Sun className="h-4 w-4" />
+                ) : (
+                  <Moon className="h-4 w-4" />
+                )}
+                <span className="sr-only">Toggle theme</span>
+              </Button>
+            )}
           </CardHeader>
 
           <CardContent className="p-6 flex-1 flex flex-col gap-8 overflow-hidden min-h-0">
@@ -265,7 +352,7 @@ export default function Home() {
                   Run Nominal
                 </Button>
                 <Button
-                  className="w-full flex items-center gap-2"
+                  className="w-full flex items-center gap-2 bg-secondary/80 hover:bg-secondary text-secondary-foreground"
                   variant="secondary"
                   size="lg"
                   onClick={() => runSimulation(true)}

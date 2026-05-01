@@ -1,0 +1,408 @@
+"use client";
+
+import { useEffect, useMemo, useRef, Fragment } from "react";
+import {
+  MapContainer,
+  TileLayer,
+  GeoJSON,
+  useMap,
+  LayersControl,
+  FeatureGroup,
+  Marker,
+  Tooltip,
+  Polygon,
+} from "react-leaflet";
+import "leaflet/dist/leaflet.css";
+import { kml } from "@tmcw/togeojson";
+import L from "leaflet";
+import type { FeatureCollection } from "geojson";
+import * as htmlToImage from "html-to-image";
+import { Camera } from "lucide-react";
+
+// Fix Leaflet's default icon path issues in React/Webpack environments
+let redDotIcon: L.DivIcon | undefined;
+if (typeof window !== "undefined") {
+  delete (L.Icon.Default.prototype as any)._getIconUrl;
+  L.Icon.Default.mergeOptions({
+    iconRetinaUrl:
+      "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
+    iconUrl:
+      "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
+    shadowUrl:
+      "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
+  });
+
+  redDotIcon = L.divIcon({
+    className: "bg-transparent",
+    html: `<div style="width: 12px; height: 12px; background-color: #ef4444; border-radius: 50%; border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.3);"></div>`,
+    iconSize: [12, 12],
+    iconAnchor: [6, 6],
+  });
+}
+
+// Helper component to auto-adjust the map view to fit all GeoJSON layers
+function MapBounds({ geoJsonData }: { geoJsonData: FeatureCollection[] }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (geoJsonData.length === 0) return;
+
+    try {
+      const bounds = L.latLngBounds([]);
+      geoJsonData.forEach((fc) => {
+        const layer = L.geoJSON(fc);
+        bounds.extend(layer.getBounds());
+      });
+
+      if (bounds.isValid()) {
+        map.fitBounds(bounds, { padding: [30, 30] });
+      }
+    } catch (e) {
+      console.error("Error setting map bounds", e);
+    }
+  }, [geoJsonData, map]);
+
+  return null;
+}
+
+type LegendItem = {
+  speedNum: number;
+  speedStr: string;
+  trajColor: string;
+  paraColor: string;
+};
+
+export interface MapViewerProps {
+  kmlData: Record<string, string>;
+  launchPos?: [number, number] | null;
+  safetyArea?: [number, number][];
+}
+
+export default function MapViewer({
+  kmlData,
+  launchPos,
+  safetyArea,
+}: MapViewerProps) {
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+
+  // Parse the KML strings into GeoJSON objects, grouped by phase
+  // Also extract dynamic colors and wind speeds for the legend
+  const { trajectoryFeatures, parachuteFeatures, allFeatures, legendData } =
+    useMemo(() => {
+      const trajectory: FeatureCollection[] = [];
+      const parachute: FeatureCollection[] = [];
+      const all: FeatureCollection[] = [];
+      const legendMap = new Map<number, LegendItem>();
+
+      if (typeof window === "undefined") {
+        return {
+          trajectoryFeatures: trajectory,
+          parachuteFeatures: parachute,
+          allFeatures: all,
+          legendData: [],
+        };
+      }
+
+      const parser = new DOMParser();
+
+      for (const [filename, kmlString] of Object.entries(kmlData)) {
+        if (!kmlString) continue;
+
+        try {
+          const doc = parser.parseFromString(kmlString, "text/xml");
+          const converted = kml(doc) as FeatureCollection;
+          const isParachute = filename.toLowerCase().includes("parachute");
+
+          converted.features.forEach((f) => {
+            if (!f.properties) f.properties = {};
+            f.properties.sourceFile = filename;
+
+            const color =
+              f.properties.stroke || (isParachute ? "#ff4500" : "#00bfff");
+            const name = f.properties.name || "";
+
+            // Extract wind speed from KML name (e.g., "Trajectory - Wind 1.0 m/s")
+            const match = name.match(/Wind\s+([\d\.]+)\s+m\/s/i);
+            if (match) {
+              const speedNum = parseFloat(match[1]);
+              const speedStr = `${match[1]} m/s`;
+
+              if (!legendMap.has(speedNum)) {
+                legendMap.set(speedNum, {
+                  speedNum,
+                  speedStr,
+                  trajColor: "#cccccc", // fallback if only parachute exists
+                  paraColor: "#cccccc", // fallback if only trajectory exists
+                });
+              }
+
+              const entry = legendMap.get(speedNum)!;
+              if (isParachute) {
+                entry.paraColor = color;
+              } else {
+                entry.trajColor = color;
+              }
+            }
+          });
+
+          // Reverse the rendering order of features so low wind is drawn last (on top)
+          converted.features.reverse();
+
+          all.push(converted);
+
+          if (isParachute) {
+            parachute.push(converted);
+          } else {
+            trajectory.push(converted);
+          }
+        } catch (err) {
+          console.error(`Failed to parse KML for ${filename}`, err);
+        }
+      }
+
+      // Sort legend items by wind speed
+      const sortedLegendData = Array.from(legendMap.values()).sort(
+        (a, b) => a.speedNum - b.speedNum,
+      );
+
+      return {
+        trajectoryFeatures: trajectory,
+        parachuteFeatures: parachute,
+        allFeatures: all,
+        legendData: sortedLegendData,
+      };
+    }, [kmlData]);
+
+  const defaultCenter: [number, number] = [34.2852, 135.09059];
+
+  // Tooltip handler
+  const onEachFeature = (feature: any, layer: L.Layer) => {
+    if (feature.properties) {
+      const name = feature.properties.name;
+      const desc = feature.properties.description;
+      if (name || desc) {
+        let tooltipContent = `<div style="font-family: system-ui, -apple-system, sans-serif;">`;
+        if (name)
+          tooltipContent += `<strong style="font-size: 14px; color: #111;">${name}</strong>`;
+        if (desc)
+          tooltipContent += `<br/><span style="color: #4b5563; font-size: 12px; margin-top: 4px; display: inline-block;">${desc}</span>`;
+        tooltipContent += `</div>`;
+        layer.bindTooltip(tooltipContent, { sticky: true });
+      }
+    }
+  };
+
+  const getStyle = (feature: any) => {
+    if (feature?.properties) {
+      const isParachute = feature.properties.sourceFile?.includes("parachute");
+      let color = feature.properties.stroke;
+
+      // Fallback for single run (which doesn't use export_loop_kml yet)
+      if (!color) {
+        color = isParachute ? "#ff4500" : "#00bfff";
+      }
+
+      return {
+        color: color,
+        weight: feature.properties["stroke-width"] || 2,
+        opacity: feature.properties["stroke-opacity"] ?? 1.0,
+        fill: false, // Completely remove the fill as requested
+      };
+    }
+    return { color: "#22d3ee", weight: 2, fill: false };
+  };
+
+  const handleScreenshot = async () => {
+    if (!mapContainerRef.current) return;
+    try {
+      const dataUrl = await htmlToImage.toPng(mapContainerRef.current, {
+        cacheBust: true,
+        filter: (node) => {
+          if (node instanceof HTMLElement) {
+            return (
+              !node.classList.contains("no-screenshot") &&
+              !node.classList.contains("leaflet-control-zoom") &&
+              !node.classList.contains("leaflet-control-layers")
+            );
+          }
+          return true;
+        },
+      });
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = `nabla_map_screenshot_${new Date().getTime()}.png`;
+      a.click();
+    } catch (err) {
+      console.error("Screenshot failed", err);
+    }
+  };
+
+  return (
+    <div
+      className="w-full h-full relative bg-slate-900"
+      style={{ zIndex: 0 }}
+      ref={mapContainerRef}
+    >
+      {/*
+        React-based Overlays (Outside of MapContainer).
+        This avoids 'createRoot' and DOM manipulation errors caused by Leaflet.
+      */}
+
+      {/* External Screenshot Button overlay positioned next to zoom controls */}
+      <div className="absolute top-4 left-14 z-[1000] no-screenshot">
+        <button
+          onClick={handleScreenshot}
+          className="bg-white hover:bg-slate-50 text-slate-700 w-[34px] h-[34px] rounded-[4px] shadow-[0_1px_4px_rgba(0,0,0,0.3)] border-[2px] border-black/10 flex items-center justify-center transition-colors"
+          title="Save Screenshot"
+        >
+          <Camera className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Dynamic Legend matching the reference image style */}
+      {legendData.length > 0 && (
+        <div className="absolute bottom-6 right-6 z-[1000] bg-white/95 p-4 rounded-lg shadow-[0_2px_10px_rgba(0,0,0,0.2)] text-slate-800 font-sans pointer-events-auto border border-slate-200/60">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-3.5 h-3.5 rounded-full bg-red-600 shadow-sm border border-red-700"></div>
+            <span className="font-bold text-[15px] tracking-tight">
+              Launch point
+            </span>
+          </div>
+
+          <div className="grid grid-cols-[auto_auto_1fr] gap-x-4 gap-y-1.5 items-center">
+            {/* Legend Table Headers */}
+            <div className="text-[10px] font-bold text-center text-slate-400 uppercase tracking-widest pb-1 border-b border-slate-200">
+              Traj.
+            </div>
+            <div className="text-[10px] font-bold text-center text-slate-400 uppercase tracking-widest pb-1 border-b border-slate-200">
+              Para.
+            </div>
+            <div className="text-[10px] font-bold text-left text-slate-400 uppercase tracking-widest pb-1 border-b border-slate-200">
+              Wind
+            </div>
+
+            {/* Legend Rows (Parsed dynamically from KML properties) */}
+            {legendData.map((item) => (
+              <Fragment key={item.speedStr}>
+                {/* Trajectory Style (Cold) */}
+                <div className="flex items-center w-8" title="Trajectory">
+                  <div
+                    className="h-[2px] flex-1"
+                    style={{ backgroundColor: item.trajColor }}
+                  ></div>
+                  <div
+                    className="w-2.5 h-2.5 rounded-full"
+                    style={{ backgroundColor: item.trajColor }}
+                  ></div>
+                  <div
+                    className="h-[2px] flex-1"
+                    style={{ backgroundColor: item.trajColor }}
+                  ></div>
+                </div>
+
+                {/* Parachute Style (Warm) */}
+                <div className="flex items-center w-8" title="Parachute">
+                  <div
+                    className="h-[2px] flex-1"
+                    style={{ backgroundColor: item.paraColor }}
+                  ></div>
+                  <div
+                    className="w-2.5 h-2.5 rounded-full"
+                    style={{ backgroundColor: item.paraColor }}
+                  ></div>
+                  <div
+                    className="h-[2px] flex-1"
+                    style={{ backgroundColor: item.paraColor }}
+                  ></div>
+                </div>
+
+                {/* Wind Speed */}
+                <div className="text-[14px] font-medium ml-1 tabular-nums">
+                  {item.speedStr}
+                </div>
+              </Fragment>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Leaflet Map */}
+      <MapContainer
+        center={defaultCenter}
+        zoom={13}
+        className="w-full h-full absolute inset-0"
+        zoomControl={true}
+      >
+        {/* crossOrigin="anonymous" is crucial for html2canvas to capture map tiles securely */}
+        <TileLayer
+          attribution="Tiles &copy; Esri &mdash; Source: Esri"
+          url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+          maxZoom={19}
+          crossOrigin="anonymous"
+        />
+
+        {launchPos && redDotIcon && (
+          <Marker position={launchPos} icon={redDotIcon} />
+        )}
+
+        <LayersControl position="topright">
+          {safetyArea && safetyArea.length > 0 && (
+            <LayersControl.Overlay checked name="Safety Area">
+              <Polygon
+                positions={safetyArea}
+                pathOptions={{
+                  color: "#000000",
+                  fillColor: "#000000",
+                  fillOpacity: 0.35,
+                  weight: 2,
+                  dashArray: "5, 5",
+                }}
+              >
+                <Tooltip
+                  direction="top"
+                  opacity={0.9}
+                  sticky
+                  className="font-sans font-bold text-slate-800 bg-white border-0 shadow-sm rounded-md px-2 py-1"
+                >
+                  Safety Area
+                </Tooltip>
+              </Polygon>
+            </LayersControl.Overlay>
+          )}
+
+          {trajectoryFeatures.length > 0 && (
+            <LayersControl.Overlay checked name="Trajectory Phase">
+              <FeatureGroup>
+                {trajectoryFeatures.map((data, idx) => (
+                  <GeoJSON
+                    key={`traj-${idx}`}
+                    data={data}
+                    onEachFeature={onEachFeature}
+                    style={getStyle}
+                  />
+                ))}
+              </FeatureGroup>
+            </LayersControl.Overlay>
+          )}
+
+          {parachuteFeatures.length > 0 && (
+            <LayersControl.Overlay checked name="Parachute Phase">
+              <FeatureGroup>
+                {parachuteFeatures.map((data, idx) => (
+                  <GeoJSON
+                    key={`para-${idx}`}
+                    data={data}
+                    onEachFeature={onEachFeature}
+                    style={getStyle}
+                  />
+                ))}
+              </FeatureGroup>
+            </LayersControl.Overlay>
+          )}
+        </LayersControl>
+
+        <MapBounds geoJsonData={allFeatures} />
+      </MapContainer>
+    </div>
+  );
+}

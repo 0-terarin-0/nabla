@@ -145,6 +145,94 @@ fn write_kml_linestring(
 
 pub fn export_loop_kml(
     path: &str,
+    llh: &nalgebra::Vector3<f64>,
+    pos_matrix: &[Vec<nalgebra::Vector3<f64>>],
+    speeds: &[f64],
+    color: &str,
+) -> anyhow::Result<()> {
+    use std::io::Write;
+    let mut file = std::fs::File::create(path).unwrap();
+    writeln!(file, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>").unwrap();
+    writeln!(file, "<kml xmlns=\"http://www.opengis.net/kml/2.2\">").unwrap();
+    writeln!(file, "  <Document>").unwrap();
+
+    let is_para = color.to_lowercase().contains("ffffff00") || path.contains("parachute");
+    let name_prefix = if is_para { "Parachute" } else { "Trajectory" };
+
+    for (i, speed) in speeds.iter().enumerate() {
+        if i >= pos_matrix.len() {
+            break;
+        }
+
+        let fraction = if speeds.len() > 1 {
+            i as f64 / (speeds.len() - 1) as f64
+        } else {
+            0.0
+        };
+
+        let (r, g, b) = if is_para {
+            // Warm colors for Parachute: Yellow (low) -> Red (high)
+            (255, (255.0 * (1.0 - fraction)) as u8, 0)
+        } else {
+            // Cold colors for Trajectory: Cyan (low) -> Blue (high)
+            (0, (255.0 * (1.0 - fraction)) as u8, 255)
+        };
+
+        // KML format is AABBGGRR
+        let line_color = format!("ff{:02x}{:02x}{:02x}", b, g, r);
+
+        writeln!(file, "    <Placemark>").unwrap();
+        writeln!(
+            file,
+            "      <name>{} - Wind {:.1} m/s</name>",
+            name_prefix, speed
+        )
+        .unwrap();
+        writeln!(
+            file,
+            "      <description>Phase: {}, Wind Speed: {:.1} m/s</description>",
+            name_prefix, speed
+        )
+        .unwrap();
+        writeln!(file, "      <Style>").unwrap();
+        writeln!(
+            file,
+            "        <LineStyle><color>{}</color><width>2</width></LineStyle>",
+            line_color
+        )
+        .unwrap();
+        writeln!(file, "        <PolyStyle><fill>0</fill></PolyStyle>").unwrap();
+        writeln!(file, "      </Style>").unwrap();
+        writeln!(file, "      <Polygon>").unwrap();
+        writeln!(file, "        <outerBoundaryIs>").unwrap();
+        writeln!(file, "          <LinearRing>").unwrap();
+        writeln!(file, "            <coordinates>").unwrap();
+
+        for pt in &pos_matrix[i] {
+            let lla = ned2llh(llh, pt);
+            writeln!(file, "              {},{},{}", lla[1], lla[0], lla[2]).unwrap();
+        }
+
+        if let Some(pt) = pos_matrix[i].first() {
+            let lla = ned2llh(llh, pt);
+            writeln!(file, "              {},{},{}", lla[1], lla[0], lla[2]).unwrap();
+        }
+
+        writeln!(file, "            </coordinates>").unwrap();
+        writeln!(file, "          </LinearRing>").unwrap();
+        writeln!(file, "        </outerBoundaryIs>").unwrap();
+        writeln!(file, "      </Polygon>").unwrap();
+        writeln!(file, "    </Placemark>").unwrap();
+    }
+
+    writeln!(file, "  </Document>").unwrap();
+    writeln!(file, "</kml>").unwrap();
+    Ok(())
+}
+
+#[allow(dead_code)]
+pub fn export_loop_kml_old(
+    path: &str,
     launch_llh: &Vector3<f64>,
     pos_matrix: &[Vec<Vector3<f64>>],
     speeds: &[f64],
