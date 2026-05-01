@@ -407,6 +407,7 @@ function Home() {
     const [safetyArea, setSafetyArea] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])([]);
     const [activeTab, setActiveTab] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])("editor");
     const fileInputRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"])(null);
+    const tomlInputRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"])(null);
     const { theme, setTheme } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2d$themes$2f$dist$2f$index$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useTheme"])();
     const [mounted, setMounted] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(false);
     // Fetch default configuration from Rust backend on load
@@ -424,6 +425,21 @@ function Home() {
         }
         loadConfig();
     }, []);
+    const handleTomlUpload = async (e)=>{
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+        const file = files[0];
+        try {
+            const text = await file.text();
+            setConfigText(text);
+            setStatusMsg(`Loaded TOML file: ${file.name}`);
+        } catch (err) {
+            console.error("Failed to read TOML file:", err);
+            setStatusMsg("Failed to load TOML file.");
+            setIsError(true);
+        }
+        if (tomlInputRef.current) tomlInputRef.current.value = "";
+    };
     const handleFileUpload = async (e)=>{
         const files = e.target.files;
         if (!files) return;
@@ -514,119 +530,160 @@ function Home() {
                         className: "flex-1 flex flex-col min-h-0 overflow-hidden",
                         children: [
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$src$2f$components$2f$ui$2f$tabs$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["TabsList"], {
-                                className: "grid w-full grid-cols-2 mb-2 bg-muted/50 p-1",
+                                className: "grid w-fit grid-cols-2 mb-2 bg-muted/50 p-1",
                                 children: [
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$src$2f$components$2f$ui$2f$tabs$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["TabsTrigger"], {
                                         value: "editor",
-                                        className: "flex items-center gap-2 font-medium",
+                                        className: "flex items-center gap-2 font-medium px-6",
                                         children: [
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$code$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Code$3e$__["Code"], {
                                                 className: "w-4 h-4"
                                             }, void 0, false, {
                                                 fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                                lineNumber: 186,
+                                                lineNumber: 203,
                                                 columnNumber: 17
                                             }, this),
                                             "Configuration"
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                        lineNumber: 182,
+                                        lineNumber: 199,
                                         columnNumber: 15
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$src$2f$components$2f$ui$2f$tabs$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["TabsTrigger"], {
                                         value: "map",
-                                        className: "flex items-center gap-2 font-medium",
+                                        className: "flex items-center gap-2 font-medium px-6",
                                         children: [
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$map$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Map$3e$__["Map"], {
                                                 className: "w-4 h-4"
                                             }, void 0, false, {
                                                 fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                                lineNumber: 193,
+                                                lineNumber: 210,
                                                 columnNumber: 17
                                             }, this),
                                             "Flight Map"
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                        lineNumber: 189,
+                                        lineNumber: 206,
                                         columnNumber: 15
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                lineNumber: 181,
+                                lineNumber: 198,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$src$2f$components$2f$ui$2f$tabs$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["TabsContent"], {
                                 value: "editor",
-                                className: "flex-1 flex flex-col min-h-0 overflow-hidden gap-4 m-0 data-[state=active]:flex",
+                                className: "flex-1 min-h-0 mt-0 flex flex-col gap-3 data-[state=active]:flex",
                                 children: [
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Card"], {
                                         className: "flex-1 flex flex-col shadow-sm overflow-hidden min-h-0 bg-card border-border",
                                         children: [
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["CardHeader"], {
-                                                className: "bg-muted/30 border-b border-border pb-3 shrink-0",
-                                                children: [
-                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["CardTitle"], {
-                                                        className: "flex items-center gap-2 text-lg tracking-tight",
-                                                        children: [
-                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$settings$2d$2$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Settings2$3e$__["Settings2"], {
-                                                                className: "w-5 h-5 text-muted-foreground"
-                                                            }, void 0, false, {
-                                                                fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                                                lineNumber: 206,
-                                                                columnNumber: 21
-                                                            }, this),
-                                                            "Editor"
-                                                        ]
-                                                    }, void 0, true, {
-                                                        fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                                        lineNumber: 205,
-                                                        columnNumber: 19
-                                                    }, this),
-                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["CardDescription"], {
-                                                        children: "Edit your rocket simulation parameters in TOML format."
-                                                    }, void 0, false, {
-                                                        fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                                        lineNumber: 209,
-                                                        columnNumber: 19
-                                                    }, this)
-                                                ]
-                                            }, void 0, true, {
+                                                className: "bg-muted/30 border-b border-border py-2 px-4 shrink-0",
+                                                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                    className: "flex justify-between items-center",
+                                                    children: [
+                                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["CardTitle"], {
+                                                            className: "flex items-center gap-2 text-base tracking-tight",
+                                                            children: [
+                                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$settings$2d$2$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Settings2$3e$__["Settings2"], {
+                                                                    className: "w-4 h-4 text-muted-foreground"
+                                                                }, void 0, false, {
+                                                                    fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
+                                                                    lineNumber: 224,
+                                                                    columnNumber: 23
+                                                                }, this),
+                                                                "Editor"
+                                                            ]
+                                                        }, void 0, true, {
+                                                            fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
+                                                            lineNumber: 223,
+                                                            columnNumber: 21
+                                                        }, this),
+                                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                            children: [
+                                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                                                    type: "file",
+                                                                    accept: ".toml,.txt",
+                                                                    className: "hidden",
+                                                                    ref: tomlInputRef,
+                                                                    onChange: handleTomlUpload,
+                                                                    disabled: isSimulating
+                                                                }, void 0, false, {
+                                                                    fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
+                                                                    lineNumber: 228,
+                                                                    columnNumber: 23
+                                                                }, this),
+                                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Button"], {
+                                                                    variant: "outline",
+                                                                    size: "sm",
+                                                                    className: "h-7 gap-1 text-xs px-2 bg-background",
+                                                                    onClick: ()=>tomlInputRef.current?.click(),
+                                                                    disabled: isSimulating,
+                                                                    children: [
+                                                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$upload$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Upload$3e$__["Upload"], {
+                                                                            className: "w-3.5 h-3.5"
+                                                                        }, void 0, false, {
+                                                                            fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
+                                                                            lineNumber: 243,
+                                                                            columnNumber: 25
+                                                                        }, this),
+                                                                        "Upload TOML"
+                                                                    ]
+                                                                }, void 0, true, {
+                                                                    fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
+                                                                    lineNumber: 236,
+                                                                    columnNumber: 23
+                                                                }, this)
+                                                            ]
+                                                        }, void 0, true, {
+                                                            fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
+                                                            lineNumber: 227,
+                                                            columnNumber: 21
+                                                        }, this)
+                                                    ]
+                                                }, void 0, true, {
+                                                    fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
+                                                    lineNumber: 222,
+                                                    columnNumber: 19
+                                                }, this)
+                                            }, void 0, false, {
                                                 fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                                lineNumber: 204,
+                                                lineNumber: 221,
                                                 columnNumber: 17
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["CardContent"], {
                                                 className: "flex-1 p-0 overflow-hidden relative",
                                                 children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$src$2f$components$2f$ui$2f$textarea$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Textarea"], {
-                                                    className: "absolute inset-0 w-full h-full font-mono text-sm border-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none p-6 resize-none bg-transparent text-foreground",
+                                                    className: "absolute inset-0 w-full h-full font-mono text-sm border-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none p-4 resize-none bg-transparent text-foreground",
                                                     value: configText,
                                                     onChange: (e)=>setConfigText(e.target.value),
                                                     spellCheck: false,
                                                     disabled: isSimulating
                                                 }, void 0, false, {
                                                     fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                                    lineNumber: 214,
+                                                    lineNumber: 250,
                                                     columnNumber: 19
                                                 }, this)
                                             }, void 0, false, {
                                                 fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                                lineNumber: 213,
+                                                lineNumber: 249,
                                                 columnNumber: 17
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                        lineNumber: 203,
+                                        lineNumber: 220,
                                         columnNumber: 15
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Card"], {
                                         className: "shrink-0 shadow-sm bg-card border-border",
                                         children: [
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["CardHeader"], {
-                                                className: "bg-muted/30 border-b border-border py-3 px-4",
+                                                className: "bg-muted/30 border-b border-border py-2 px-4",
                                                 children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                                     className: "flex justify-between items-center",
                                                     children: [
@@ -637,14 +694,14 @@ function Home() {
                                                                     className: "w-4 h-4 text-muted-foreground"
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                                                    lineNumber: 229,
+                                                                    lineNumber: 265,
                                                                     columnNumber: 23
                                                                 }, this),
                                                                 "External Files (CSV)"
                                                             ]
                                                         }, void 0, true, {
                                                             fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                                            lineNumber: 228,
+                                                            lineNumber: 264,
                                                             columnNumber: 21
                                                         }, this),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -658,13 +715,13 @@ function Home() {
                                                                     onChange: handleFileUpload
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                                                    lineNumber: 233,
+                                                                    lineNumber: 269,
                                                                     columnNumber: 23
                                                                 }, this),
                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Button"], {
                                                                     variant: "outline",
                                                                     size: "sm",
-                                                                    className: "h-8 gap-1.5 text-xs bg-background",
+                                                                    className: "h-7 gap-1 text-xs px-2 bg-background",
                                                                     onClick: ()=>fileInputRef.current?.click(),
                                                                     disabled: isSimulating,
                                                                     children: [
@@ -672,53 +729,53 @@ function Home() {
                                                                             className: "w-3.5 h-3.5"
                                                                         }, void 0, false, {
                                                                             fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                                                            lineNumber: 248,
+                                                                            lineNumber: 284,
                                                                             columnNumber: 25
                                                                         }, this),
                                                                         "Add CSVs"
                                                                     ]
                                                                 }, void 0, true, {
                                                                     fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                                                    lineNumber: 241,
+                                                                    lineNumber: 277,
                                                                     columnNumber: 23
                                                                 }, this)
                                                             ]
                                                         }, void 0, true, {
                                                             fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                                            lineNumber: 232,
+                                                            lineNumber: 268,
                                                             columnNumber: 21
                                                         }, this)
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                                    lineNumber: 227,
+                                                    lineNumber: 263,
                                                     columnNumber: 19
                                                 }, this)
                                             }, void 0, false, {
                                                 fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                                lineNumber: 226,
+                                                lineNumber: 262,
                                                 columnNumber: 17
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["CardContent"], {
-                                                className: "p-3 min-h-[4rem] flex items-center",
+                                                className: "p-2 min-h-[3rem] flex items-center",
                                                 children: extraFiles.length === 0 ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                                    className: "text-sm text-muted-foreground italic text-center w-full",
+                                                    className: "text-xs text-muted-foreground italic text-center w-full",
                                                     children: "No external files added."
                                                 }, void 0, false, {
                                                     fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                                    lineNumber: 256,
+                                                    lineNumber: 292,
                                                     columnNumber: 21
                                                 }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                    className: "flex flex-wrap gap-2",
+                                                    className: "flex flex-wrap gap-1.5",
                                                     children: extraFiles.map((file)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$src$2f$components$2f$ui$2f$badge$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Badge"], {
                                                             variant: "secondary",
-                                                            className: "px-2 py-1 pr-1 flex items-center gap-1 font-medium",
+                                                            className: "px-2 py-0.5 pr-1 flex items-center gap-1 font-medium text-xs",
                                                             children: [
                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$file$2d$spreadsheet$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__FileSpreadsheet$3e$__["FileSpreadsheet"], {
                                                                     className: "w-3 h-3 text-muted-foreground"
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                                                    lineNumber: 267,
+                                                                    lineNumber: 303,
                                                                     columnNumber: 27
                                                                 }, this),
                                                                 file.name,
@@ -731,45 +788,45 @@ function Home() {
                                                                         className: "w-3 h-3 text-muted-foreground"
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                                                        lineNumber: 275,
+                                                                        lineNumber: 311,
                                                                         columnNumber: 29
                                                                     }, this)
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                                                    lineNumber: 269,
+                                                                    lineNumber: 305,
                                                                     columnNumber: 27
                                                                 }, this)
                                                             ]
                                                         }, file.name, true, {
                                                             fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                                            lineNumber: 262,
+                                                            lineNumber: 298,
                                                             columnNumber: 25
                                                         }, this))
                                                 }, void 0, false, {
                                                     fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                                    lineNumber: 260,
+                                                    lineNumber: 296,
                                                     columnNumber: 21
                                                 }, this)
                                             }, void 0, false, {
                                                 fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                                lineNumber: 254,
+                                                lineNumber: 290,
                                                 columnNumber: 17
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                        lineNumber: 225,
+                                        lineNumber: 261,
                                         columnNumber: 15
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                lineNumber: 198,
+                                lineNumber: 215,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$src$2f$components$2f$ui$2f$tabs$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["TabsContent"], {
                                 value: "map",
-                                className: "flex-1 flex flex-col min-h-0 m-0 data-[state=active]:flex",
+                                className: "flex-1 flex flex-col min-h-0 mt-0 data-[state=active]:flex",
                                 children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Card"], {
                                     className: "flex-1 shadow-sm border-border bg-card overflow-hidden",
                                     children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -780,7 +837,7 @@ function Home() {
                                             safetyArea: safetyArea
                                         }, void 0, false, {
                                             fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                            lineNumber: 292,
+                                            lineNumber: 328,
                                             columnNumber: 21
                                         }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                             className: "w-full h-full flex flex-col items-center justify-center text-muted-foreground bg-muted/10",
@@ -789,14 +846,14 @@ function Home() {
                                                     className: "w-12 h-12 mb-4 text-muted-foreground/30"
                                                 }, void 0, false, {
                                                     fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                                    lineNumber: 299,
+                                                    lineNumber: 335,
                                                     columnNumber: 23
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
                                                     children: "No map data available."
                                                 }, void 0, false, {
                                                     fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                                    lineNumber: 300,
+                                                    lineNumber: 336,
                                                     columnNumber: 23
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -804,39 +861,39 @@ function Home() {
                                                     children: "Run a simulation to view the trajectory."
                                                 }, void 0, false, {
                                                     fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                                    lineNumber: 301,
+                                                    lineNumber: 337,
                                                     columnNumber: 23
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                            lineNumber: 298,
+                                            lineNumber: 334,
                                             columnNumber: 21
                                         }, this)
                                     }, void 0, false, {
                                         fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                        lineNumber: 290,
+                                        lineNumber: 326,
                                         columnNumber: 17
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                    lineNumber: 289,
+                                    lineNumber: 325,
                                     columnNumber: 15
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                lineNumber: 285,
+                                lineNumber: 321,
                                 columnNumber: 13
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                        lineNumber: 176,
+                        lineNumber: 193,
                         columnNumber: 11
                     }, this)
                 }, void 0, false, {
                     fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                    lineNumber: 175,
+                    lineNumber: 192,
                     columnNumber: 9
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Card"], {
@@ -854,27 +911,27 @@ function Home() {
                                                     className: "w-5 h-5 text-primary"
                                                 }, void 0, false, {
                                                     fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                                    lineNumber: 317,
+                                                    lineNumber: 353,
                                                     columnNumber: 17
                                                 }, this),
                                                 "Nabla Simulator"
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                            lineNumber: 316,
+                                            lineNumber: 352,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["CardDescription"], {
                                             children: "Execution & Results"
                                         }, void 0, false, {
                                             fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                            lineNumber: 320,
+                                            lineNumber: 356,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                    lineNumber: 315,
+                                    lineNumber: 351,
                                     columnNumber: 13
                                 }, this),
                                 mounted && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Button"], {
@@ -887,13 +944,13 @@ function Home() {
                                             className: "h-4 w-4"
                                         }, void 0, false, {
                                             fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                            lineNumber: 330,
+                                            lineNumber: 366,
                                             columnNumber: 19
                                         }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$moon$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Moon$3e$__["Moon"], {
                                             className: "h-4 w-4"
                                         }, void 0, false, {
                                             fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                            lineNumber: 332,
+                                            lineNumber: 368,
                                             columnNumber: 19
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -901,19 +958,19 @@ function Home() {
                                             children: "Toggle theme"
                                         }, void 0, false, {
                                             fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                            lineNumber: 334,
+                                            lineNumber: 370,
                                             columnNumber: 17
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                    lineNumber: 323,
+                                    lineNumber: 359,
                                     columnNumber: 15
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                            lineNumber: 314,
+                            lineNumber: 350,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["CardContent"], {
@@ -927,7 +984,7 @@ function Home() {
                                             children: "Simulation Controls"
                                         }, void 0, false, {
                                             fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                            lineNumber: 341,
+                                            lineNumber: 377,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -943,14 +1000,14 @@ function Home() {
                                                             className: "w-4 h-4"
                                                         }, void 0, false, {
                                                             fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                                            lineNumber: 351,
+                                                            lineNumber: 387,
                                                             columnNumber: 19
                                                         }, this),
                                                         "Run Nominal"
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                                    lineNumber: 345,
+                                                    lineNumber: 381,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Button"], {
@@ -964,26 +1021,26 @@ function Home() {
                                                             className: "w-4 h-4"
                                                         }, void 0, false, {
                                                             fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                                            lineNumber: 361,
+                                                            lineNumber: 397,
                                                             columnNumber: 19
                                                         }, this),
                                                         "Run Dispersion (Loop)"
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                                    lineNumber: 354,
+                                                    lineNumber: 390,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                            lineNumber: 344,
+                                            lineNumber: 380,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                    lineNumber: 340,
+                                    lineNumber: 376,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -994,7 +1051,7 @@ function Home() {
                                             children: "Status Log"
                                         }, void 0, false, {
                                             fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                            lineNumber: 368,
+                                            lineNumber: 404,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1002,19 +1059,19 @@ function Home() {
                                             children: statusMsg
                                         }, void 0, false, {
                                             fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                            lineNumber: 371,
+                                            lineNumber: 407,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                    lineNumber: 367,
+                                    lineNumber: 403,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                            lineNumber: 339,
+                            lineNumber: 375,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["CardFooter"], {
@@ -1025,7 +1082,7 @@ function Home() {
                                     children: "System Status"
                                 }, void 0, false, {
                                     fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                    lineNumber: 384,
+                                    lineNumber: 420,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$nabla$2f$nabla$2d$tauri$2f$src$2f$components$2f$ui$2f$badge$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Badge"], {
@@ -1034,30 +1091,30 @@ function Home() {
                                     children: isSimulating ? "Computing..." : "Idle"
                                 }, void 0, false, {
                                     fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                                    lineNumber: 387,
+                                    lineNumber: 423,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                            lineNumber: 383,
+                            lineNumber: 419,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-                    lineNumber: 313,
+                    lineNumber: 349,
                     columnNumber: 9
                 }, this)
             ]
         }, void 0, true, {
             fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-            lineNumber: 173,
+            lineNumber: 190,
             columnNumber: 7
         }, this)
     }, void 0, false, {
         fileName: "[project]/nabla/nabla-tauri/src/app/page.tsx",
-        lineNumber: 172,
+        lineNumber: 189,
         columnNumber: 5
     }, this);
 }

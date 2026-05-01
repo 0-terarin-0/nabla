@@ -64,8 +64,9 @@ export default function Home() {
   const [launchPos, setLaunchPos] = useState<[number, number] | null>(null);
   const [safetyArea, setSafetyArea] = useState<[number, number][]>([]);
   const [activeTab, setActiveTab] = useState<string>("editor");
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const tomlInputRef = useRef<HTMLInputElement>(null);
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
@@ -84,6 +85,22 @@ export default function Home() {
     }
     loadConfig();
   }, []);
+
+  const handleTomlUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    try {
+      const text = await file.text();
+      setConfigText(text);
+      setStatusMsg(`Loaded TOML file: ${file.name}`);
+    } catch (err) {
+      console.error("Failed to read TOML file:", err);
+      setStatusMsg("Failed to load TOML file.");
+      setIsError(true);
+    }
+    if (tomlInputRef.current) tomlInputRef.current.value = "";
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -178,17 +195,17 @@ export default function Home() {
             onValueChange={setActiveTab}
             className="flex-1 flex flex-col min-h-0 overflow-hidden"
           >
-            <TabsList className="grid w-full grid-cols-2 mb-2 bg-muted/50 p-1">
+            <TabsList className="grid w-fit grid-cols-2 mb-2 bg-muted/50 p-1">
               <TabsTrigger
                 value="editor"
-                className="flex items-center gap-2 font-medium"
+                className="flex items-center gap-2 font-medium px-6"
               >
                 <Code className="w-4 h-4" />
                 Configuration
               </TabsTrigger>
               <TabsTrigger
                 value="map"
-                className="flex items-center gap-2 font-medium"
+                className="flex items-center gap-2 font-medium px-6"
               >
                 <MapIcon className="w-4 h-4" />
                 Flight Map
@@ -197,22 +214,41 @@ export default function Home() {
 
             <TabsContent
               value="editor"
-              className="flex-1 flex flex-col min-h-0 overflow-hidden gap-4 m-0 data-[state=active]:flex"
+              className="flex-1 min-h-0 mt-0 flex flex-col gap-3 data-[state=active]:flex"
             >
               {/* TOML Editor */}
               <Card className="flex-1 flex flex-col shadow-sm overflow-hidden min-h-0 bg-card border-border">
-                <CardHeader className="bg-muted/30 border-b border-border pb-3 shrink-0">
-                  <CardTitle className="flex items-center gap-2 text-lg tracking-tight">
-                    <Settings2 className="w-5 h-5 text-muted-foreground" />
-                    Editor
-                  </CardTitle>
-                  <CardDescription>
-                    Edit your rocket simulation parameters in TOML format.
-                  </CardDescription>
+                <CardHeader className="bg-muted/30 border-b border-border py-2 px-4 shrink-0">
+                  <div className="flex justify-between items-center">
+                    <CardTitle className="flex items-center gap-2 text-base tracking-tight">
+                      <Settings2 className="w-4 h-4 text-muted-foreground" />
+                      Editor
+                    </CardTitle>
+                    <div>
+                      <input
+                        type="file"
+                        accept=".toml,.txt"
+                        className="hidden"
+                        ref={tomlInputRef}
+                        onChange={handleTomlUpload}
+                        disabled={isSimulating}
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 gap-1 text-xs px-2 bg-background"
+                        onClick={() => tomlInputRef.current?.click()}
+                        disabled={isSimulating}
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        Upload TOML
+                      </Button>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent className="flex-1 p-0 overflow-hidden relative">
                   <Textarea
-                    className="absolute inset-0 w-full h-full font-mono text-sm border-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none p-6 resize-none bg-transparent text-foreground"
+                    className="absolute inset-0 w-full h-full font-mono text-sm border-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none p-4 resize-none bg-transparent text-foreground"
                     value={configText}
                     onChange={(e) => setConfigText(e.target.value)}
                     spellCheck={false}
@@ -223,7 +259,7 @@ export default function Home() {
 
               {/* External CSV Files Upload */}
               <Card className="shrink-0 shadow-sm bg-card border-border">
-                <CardHeader className="bg-muted/30 border-b border-border py-3 px-4">
+                <CardHeader className="bg-muted/30 border-b border-border py-2 px-4">
                   <div className="flex justify-between items-center">
                     <CardTitle className="flex items-center gap-2 text-sm font-bold tracking-tight">
                       <FileSpreadsheet className="w-4 h-4 text-muted-foreground" />
@@ -241,7 +277,7 @@ export default function Home() {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="h-8 gap-1.5 text-xs bg-background"
+                        className="h-7 gap-1 text-xs px-2 bg-background"
                         onClick={() => fileInputRef.current?.click()}
                         disabled={isSimulating}
                       >
@@ -251,18 +287,18 @@ export default function Home() {
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="p-3 min-h-[4rem] flex items-center">
+                <CardContent className="p-2 min-h-[3rem] flex items-center">
                   {extraFiles.length === 0 ? (
-                    <p className="text-sm text-muted-foreground italic text-center w-full">
+                    <p className="text-xs text-muted-foreground italic text-center w-full">
                       No external files added.
                     </p>
                   ) : (
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-1.5">
                       {extraFiles.map((file) => (
                         <Badge
                           key={file.name}
                           variant="secondary"
-                          className="px-2 py-1 pr-1 flex items-center gap-1 font-medium"
+                          className="px-2 py-0.5 pr-1 flex items-center gap-1 font-medium text-xs"
                         >
                           <FileSpreadsheet className="w-3 h-3 text-muted-foreground" />
                           {file.name}
@@ -284,7 +320,7 @@ export default function Home() {
 
             <TabsContent
               value="map"
-              className="flex-1 flex flex-col min-h-0 m-0 data-[state=active]:flex"
+              className="flex-1 flex flex-col min-h-0 mt-0 data-[state=active]:flex"
             >
               <Card className="flex-1 shadow-sm border-border bg-card overflow-hidden">
                 <div className="w-full h-full relative">
