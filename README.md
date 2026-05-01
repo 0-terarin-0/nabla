@@ -1,87 +1,153 @@
-# nabla
+# Nabla Simulator
 
-**nabla** は、Pythonで記述されたロケット飛翔シミュレータ [miniQuabla](https://github.com/hotegg-main/miniQuabla) を Rust にフルスクラッチで移植したプロジェクトです。
+**Nabla** is a blazing-fast, multi-platform rocket flight simulator. It is a full-scratch Rust port of the Python-based [miniQuabla](https://github.com/hotegg-main/miniQuabla), enhanced with a modern Desktop GUI built using **Tauri, Next.js, and Tailwind CSS**.
 
-元のシミュレーションの物理モデル（6自由度運動方程式、パラシュートの3自由度降下、USSA1976標準大気モデルなど）と精度を完全に互換しつつ、Rustの強力な並列処理（Rayon）と計算効率を活かし、実行速度を数十倍〜数百倍にまで引き上げています。
+By leveraging Rust's performance (with Rayon for multi-threading) and Tauri's native capabilities, Nabla offers instant trajectory calculation, Monte Carlo dispersion analysis, and interactive map visualization right on your desktop.
 
-## 特徴
+## 🚀 Features
 
-* **超高速計算**:
-  単一条件（Nominal）の計算ならわずか数ミリ秒（1000秒分のシミュレーションを約1〜20msで処理）。モンテカルロ法による落下分散ループも、数十〜百以上の条件を1秒未満で計算します。
-* **TOML/CSV 自動判別**:
-  元の `miniQuabla` で使用されているフラットな `CSV` 形式の設定ファイルをそのまま読み込めるほか、より人間に読みやすく構造化された `TOML` 形式での設定にもネイティブに対応しています。
-* **Google Earth / KML 出力**:
-  弾道落下、パラシュート降下、分散円（ポリゴン）の各軌道を KML 形式で出力し、Google Earth 等で直接可視化できます。
+* **Ultra-Fast Computation**: Calculates full 6DOF trajectories and 3DOF parachute descents in mere milliseconds. Monte Carlo dispersion simulations (dozens of wind conditions) finish in less than a second.
+* **Modern GUI**: A beautiful, dark-mode-supported desktop application featuring a built-in TOML configuration editor and drag-and-drop external file uploads.
+* **Interactive Flight Map**: Integrates `react-leaflet` to display trajectories, parachute drift, and dispersion polygons directly over Esri Satellite Imagery. Includes heat-map coloring for wind speeds and an interactive legend.
+* **Safety Area Overlay**: Visualize your launch site's safety boundaries directly on the map to ensure flights remain within limits.
+* **Native Export**: Automatically zips all generated CSV logs and KML files and prompts a native OS save dialog for easy extraction to Google Earth or Excel.
 
-## 動作環境・インストール
+---
 
-Rust のツールチェーン（`cargo`）がインストールされている必要があります。
+## 🛠 Installation & Setup
 
+### Prerequisites
+* **Rust**: Ensure the Rust toolchain (`cargo`) is installed.
+* **Bun**: The modern JavaScript runtime and package manager (`bun`).
+
+### Getting Started
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/0-terarin-0/nabla.git
+   cd nabla
+   ```
+
+2. Navigate to the GUI directory and install dependencies:
+   ```bash
+   cd nabla-tauri
+   bun install
+   ```
+
+3. Run the application in development mode:
+   ```bash
+   bun run tauri dev
+   ```
+
+To build a standalone executable application for your OS (Mac `.app`, Windows `.exe`, etc.):
 ```bash
-git clone https://github.com/0-terarin-0/nabla
-cd nabla
-cargo build --release
+bun run tauri build
 ```
 
-## 使い方
+*(Note: The core engine can also be run via CLI using `cargo run -p nabla-cli --release -- [path_to_toml]` from the workspace root).*
 
-### 1. 単一条件（Nominal）のシミュレーション
+---
 
-コマンドライン引数に設定ファイルのパスを渡すことで、軌道とパラシュート降下を計算します。
-（引数を省略した場合は、デフォルトで `miniQuabla/example/rocket_config.csv` が読み込まれます）
+## ⚙️ Configuration Guide (TOML)
 
-```bash
-cargo run --release -- config/config_example.toml
+Nabla uses a structured **TOML** file for its configuration. In the GUI, you can edit this directly in the left pane. Below is a guide on how to structure your configuration file and what each section does.
+
+### Example Skeleton
+
+```toml
+[Solver]
+name = "nabla-gui"
+dt = 0.01
+t_max = 1000.0
+
+[MonteCarlo]
+speed_min = 0.0
+speed_step = 1.0
+speed_num = 9
+azimuth_min = 45.0
+azimuth_num = 16
+
+[Launcher]
+lat = 34.2852
+lon = 135.09059
+height = 90.0
+mag_dec = 7.4
+launch_elevation = 85.0
+launch_azimuth = 315.0
+rail_length = 5.0
+
+[Wind]
+wind_speed = 1.0
+wind_azimuth = 0.0
+wind_power_coeff = 4.5
+wind_alt_ref = 2.0
+exist_wind_file = false
+wind_file = ""
+
+[Geometry]
+diameter = 114.0
+length = 1320.0
+mass_dry = 6.138
+lcg_dry = 780.0
+Ij_dry_roll = 0.009
+Ij_dry_pitch = 1.042
+
+[Aerodynamics]
+lcp = 540.0
+CA = 0.41
+CNa = 5.436
+Clp = -0.0296
+Cmq = -2.11
+exsist_lcp_file = false
+exsist_CA_file = false
+exsist_CNa_file = false
+lcp_file = ""
+CA_file = ""
+CNa_file = ""
+
+[Engine]
+mass_ox = 0.2739
+mass_fuel_bef = 0.38
+mass_fuel_aft = 0.352
+lcg_ox = 136.5
+lcg_fuel = 136.0
+l_tank_cap = 273.0
+thrust_file = "thrust_example.csv"
+
+[Parachute]
+vel_para_1st = 8.80
+exist_2nd_para = false
+vel_para_2nd = 12.83
+2nd_para_timer = false
+alt_para_2nd = 300.0
+time_2nd = 20.0
+
+[Payload]
+exist_payload = false
+mass_payload = 1.0
+vel_payload = 11.55
+
+[SafetyArea]
+coordinates = [
+    [34.285604, 135.093313],
+    [34.286411, 135.092401],
+    [34.287492, 135.089311],
+    [34.283611, 135.087193],
+    [34.284049, 135.092649]
+]
 ```
 
-**実行結果の例:**
-```text
-Loading configuration from config/config_example.toml ...
+### Section Breakdown
 
-Calculating trajectory...
--> Apogee reached: 219.94 m at 7.46 s
-
-Calculating parachute descent...
--> Landed: Distance 86.29 m from launch pad at 32.46 s
-
---- Simulation Finished ---
-Solve ODE (Trajectory) : 1.19ms
-Solve ODE (Parachute)  : 236.86µs
-Total Calculation Time : 1.42ms
-```
-
-### 2. 落下分散（モンテカルロ）シミュレーション
-
-`--loop` オプションを付与することで、設定ファイル内で指定された風速・風向の組み合わせ（分散条件）をすべて並列計算します。
-
-```bash
-cargo run --release -- config/config_example.toml --loop
-```
-
-**実行結果の例:**
-```text
---- Starting Loop (Dispersion) Simulation ---
-Total conditions to compute: 144
-Exported dispersion results to land_map_trajectory.kml and land_map_parachute.kml
-Loop Simulation Time : 155.25ms
-```
-
-## 出力ファイル
-
-計算が完了すると、プロジェクトのルートディレクトリに以下のファイルが生成されます。
-
-* **`trajectory_log.csv`**: 飛翔中の機体状態（位置、速度、姿勢クォータニオンなど）の時間履歴
-* **`parachute_log.csv`**: パラシュート降下中の位置・速度の時間履歴
-* **`flight_log.kml`**: 軌道の3Dラインを描画するKMLファイル（単一条件実行時）
-* **`land_map_trajectory.kml` / `land_map_parachute.kml`**: 落下分散の着地点をポリゴンで結んだKMLファイル（`--loop` 実行時）
-
-## 設定ファイルについて
-
-TOML形式の設定ファイルは、見やすくするために任意のセクション（例：`[Geometry]`, `[Engine]`, `[Parachute]`）に分けて記述することができます。プログラム内部で自動的にフラット化されて読み込まれるため、セクションの名前や分け方は自由に変更可能です。
-
-設定例は `config/config_example.toml` などを参照してください。
+* **`[Solver]` & `[MonteCarlo]`**: Defines the simulation time steps and the array of wind speeds/azimuths used when clicking "Run Dispersion".
+* **`[Launcher]`**: Geographical location (Latitude/Longitude), elevation, launch angle, and rail length.
+* **`[Geometry]` & `[Payload]`**: Physical dimensions and mass properties of the rocket body and payload.
+* **`[Aerodynamics]`**: Aerodynamic coefficients. You can provide static numbers or set `exsist_*_file = true` and provide a CSV filename to use Mach-dependent curves.
+* **`[Engine]`**: Propellant masses and the `thrust_file` (CSV).
+  * *GUI Note*: If you specify `thrust_file = "my_thrust.csv"`, make sure to click **"Add CSVs"** in the External Files section of the GUI and upload `my_thrust.csv`.
+* **`[Parachute]`**: Parachute descent velocities, deployment timers, and dual-deployment settings.
+* **`[SafetyArea]`**: A list of `[Latitude, Longitude]` pairs. These coordinates will be drawn as a semi-transparent black polygon on the Flight Map, allowing you to easily verify if your dispersed landing points fall within the allowed zone.
 
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-（※本家 `miniQuabla` のMITライセンス化を前提として、本移植版も同等のMITライセンス下で公開されます。）

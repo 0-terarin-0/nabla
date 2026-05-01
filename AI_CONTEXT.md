@@ -6,12 +6,13 @@ Zedなどの異なるエディタや、別セッションのAIアシスタント
 
 ## プロジェクト状態 (Current Status)
 - プロジェクト名: nabla
-- 概要: Pythonで記述されたロケット飛翔シミュレータ `miniQuabla` を Rust に移植するプロジェクト。
-- 現在のフェーズ: 全モジュールのRust移植完了・全体完成
-- 設定ファイル (Config) の場所: `miniQuabla/example/rocket_config.csv` などの設定ファイルを読み込みます。元のCSV形式に加えて、TOML形式（`.toml`）の読み込みにも自動で対応しています。
+- 概要: Pythonで記述されたロケット飛翔シミュレータ `miniQuabla` を Rust に移植し、さらにデスクトップGUIを搭載したプロジェクト。
+- 現在のフェーズ: GUI (Tauri + Next.js) 実装完了・マルチプラットフォーム対応
+- アーキテクチャ: Cargo Workspace構成 (`nabla-core`: 計算エンジン, `nabla-cli`: CUI, `nabla-tauri`: GUIアプリ)
+- 設定ファイル (Config): TOML形式を標準とし、GUI内のエディタから直接編集可能。外部CSVファイルもGUIから追加可能。
 - 実行方法 (Execution): 
-  - 単一条件 (Nominal) の軌道計算: `cargo run --release -- [設定ファイルのパス]` （パス未指定時は `miniQuabla/example/rocket_config.csv` を使用）
-  - 落下分散計算 (Loop/Dispersion): `cargo run --release -- [設定ファイルのパス] --loop` （`rayon` を用いたマルチスレッド並列計算で全条件の着地点をKML出力します）
+  - GUI: `cd nabla-tauri && bun run tauri dev`
+  - CUI: `cargo run -p nabla-cli --release -- [設定ファイルのパス]`
 
 ## 進行中のタスク (Current Tasks)
 - [x] AI作業ログ用ファイル（`AI_CONTEXT.md`）の作成
@@ -25,10 +26,24 @@ Zedなどの異なるエディタや、別セッションのAIアシスタント
 - [x] 設定ファイルのTOML形式への対応と自動判別
 - [x] コードの整理・最適化 (Clippy, fmt)
 - [x] README.md と LICENSE の作成
+- [x] プロジェクトのWorkspace化 (`nabla-core`, `nabla-cli`, `nabla-tauri`)
+- [x] Tauri + Next.js (Bun) によるGUIベースアプリの構築
+- [x] UIデザインの刷新 (shadcn/ui, Tailwind CSS v4, ダークモード対応)
+- [x] GUI での設定ファイル (TOML) 編集・外部ファイル (CSV) アップロード機能
+- [x] OSネイティブダイアログを利用した結果のZIPダウンロード機能
+- [x] Leafletによるインタラクティブなフライトマップの表示機能
+  - 軌跡・分散ヒートマップポリゴンの描画
+  - 動的な凡例 (Legend) とツールチップ
+  - 保安範囲 (SafetyArea) の設定追加とマップ上へのポリゴン描画
+  - マップのスクリーンショット保存機能
+- [x] マルチプラットフォーム向けアプリアイコンの自動生成
 
 ## 決定事項 (Decisions)
 - **ログの運用**: AIによるコード修正や調査を行う際は、このファイルにステップや意図を記録し、他のツールからでも文脈が追えるようにする。
 - **変更の透明性**: コードを変更する前には「なぜその修正が必要か」「どのファイルをどう変えるか」をこのファイルに明記してから作業を行う。
+- **GUIアーキテクチャ**: 計算エンジンをWebサービスや他のUIに流用しやすくするため、既存ロジックを `nabla-core` クレートに分離し、GUIアプリは Tauri を用いて `nabla-tauri` として構築する。
+- **フロントエンド技術**: 開発効率とパフォーマンスのため、Next.js (SSG) + Tailwind CSS (shadcn/ui) を採用。パッケージマネージャは高速な `bun` を使用する。
+- **マップ表示手法**: Leaflet (`react-leaflet`) と `@tmcw/togeojson` を使用。KMLデータをRustから受け取り、フロントエンドで動的にパース・描画・色付けを行う。
 
 ## 作業ログ (Changelog)
 
@@ -83,3 +98,24 @@ Zedなどの異なるエディタや、別セッションのAIアシスタント
 ### READMEとライセンスの整備
 - 元の `miniQuabla` のMITライセンス化予定に合わせ、本プロジェクト（`nabla`）にもMITライセンス（`LICENSE`）を適用し、`Cargo.toml` にライセンス情報を記載。
 - プロジェクトの概要、特徴、インストール方法、使い方をまとめた `README.md` を作成。
+
+### プロジェクトのWorkspace構成への移行
+- GUI化を見据え、プロジェクトをCargoワークスペースとして再編成。
+- `nabla-core` (計算ライブラリ) と `nabla-cli` (コマンドラインアプリ) の2つのクレートに分割。
+- `parameter.rs` でのファイルパス解決を、設定ファイルのディレクトリ（`base_dir`）を基準に行うよう修正し、ハードコードされていた `miniQuabla/` へのパス依存を排除。
+
+### デスクトップGUI (Tauri + Next.js) の導入
+- ワークスペース内に `nabla-tauri` クレートを追加し、Tauri と Next.js (Bun) を用いたデスクトップアプリのフロントエンドを構築。
+- UIフレームワークとして Tailwind CSS v4 と shadcn/ui を導入。ダークモードとシステムテーマ切り替えに対応したモダンなカード型レイアウトを構築。
+
+### GUI機能の実装と強化
+- **Config Editor**: TOML形式の設定を画面上で直接編集できるテキストエリアを実装。
+- **外部ファイル連携**: 画面から `thrust_example.csv` などのCSVファイルをアップロードし、一時ディレクトリに展開してRustコアで利用可能にする機能を実装。
+- **実行・ZIP保存機能**: Rust側でシミュレーションを実行後、生成されたログ・KMLファイルをオンメモリでZIP圧縮。Tauriの `dialog` および `fs` プラグインを用いて、OSネイティブの「名前を付けて保存」ダイアログ経由でダウンロード可能に。
+- **インタラクティヴマップ**: `react-leaflet` と `@tmcw/togeojson` を導入し、KMLをGeoJSONに変換して衛星写真マップ上に表示。
+  - 軌道（Trajectory）は寒色系、パラシュート（Parachute）は暖色系のグラデーション（風速に応じたヒートマップ）でポリゴンを描画するようRustのKML生成ロジックを改修。
+  - 描画順序の最適化、レイヤーコントロールによる表示切り替え、動的な凡例（Legend）の追加を実装。
+  - TOML設定に `[SafetyArea]` セクションを追加し、指定された座標配列を黒色・半透明のポリゴンとしてマップ上に重畳表示する機能を追加。
+  - 射点（Launch point）の赤丸表示を実装。
+  - `html-to-image` を用いたマップのスクリーンショット保存機能を実装。
+- アプリ名（`Nabla`）の統一と、Tauri CLI (`bunx tauri icon`) によるマルチプラットフォーム向けアプリアイコンの自動生成を完了。
