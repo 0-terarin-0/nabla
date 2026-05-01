@@ -1,11 +1,11 @@
 {
-  "[project]/nabla/nabla-tauri/src/components/MapViewer.tsx [app-client] (ecmascript, next/dynamic entry)": {
-    "id": "[project]/nabla/nabla-tauri/src/components/MapViewer.tsx [app-client] (ecmascript, next/dynamic entry)",
+  "[project]/src/components/MapViewer.tsx [app-client] (ecmascript, next/dynamic entry)": {
+    "id": "[project]/src/components/MapViewer.tsx [app-client] (ecmascript, next/dynamic entry)",
     "files": [
-      "static/chunks/0-85_0tlvryx._.js",
-      "static/chunks/nabla_nabla-tauri_src_components_MapViewer_tsx_0pm0inp._.js",
-      "static/chunks/0-85_leaflet_dist_leaflet_05oulp4.css",
-      "static/chunks/nabla_nabla-tauri_src_components_MapViewer_tsx_0alyy-y._.js"
+      "static/chunks/node_modules_0gu.746._.js",
+      "static/chunks/src_components_MapViewer_tsx_0whk8f1._.js",
+      "static/chunks/node_modules_leaflet_dist_leaflet_114-xrt.css",
+      "static/chunks/src_components_MapViewer_tsx_0tg0o6z._.js"
     ]
   }
 }

@@ -2,5 +2,5 @@
 members = [
     "nabla-core",
     "nabla-cli",
-    "nabla-tauri/src-tauri",
+    "nabla-tauri/src-tauri", "nabla-server",
 ]
