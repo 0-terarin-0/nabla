@@ -1,7 +1,7 @@
 use axum::{
     Json, Router,
     extract::{DefaultBodyLimit, Multipart},
-    http::{Method, StatusCode},
+    http::{HeaderValue, Method, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post},
 };
@@ -53,7 +53,18 @@ where
 
 #[tokio::main]
 async fn main() {
-    let cors = CorsLayer::permissive();
+    let cors = CorsLayer::new()
+        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+        .allow_headers(Any)
+        .allow_credentials(true)
+        .allow_origin([
+            "http://localhost:3000".parse::<HeaderValue>().unwrap(),
+            "http://localhost:1420".parse::<HeaderValue>().unwrap(),
+            "https://nabla-sim.app".parse::<HeaderValue>().unwrap(),
+            "https://run.nabla-sim.app".parse::<HeaderValue>().unwrap(),
+            "tauri://localhost".parse::<HeaderValue>().unwrap(),
+            "https://tauri.localhost".parse::<HeaderValue>().unwrap(),
+        ]);
 
     let app = Router::new()
         .route("/health", get(|| async { "OK" }))
