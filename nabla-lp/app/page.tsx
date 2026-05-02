@@ -57,7 +57,7 @@ export default function Home() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="hover:bg-white/10 rounded-full"
+                className="hover:bg-white/10 hover:text-white rounded-full text-zinc-300"
               >
                 <GitBranch className="w-5 h-5" />
                 <span className="sr-only">GitHub</span>
@@ -113,7 +113,7 @@ export default function Home() {
             <Link href="https://run.nabla-sim.app">
               <Button
                 size="lg"
-                className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-full px-8 h-14 text-lg font-medium w-full sm:w-auto group"
+                className="bg-emerald-600 hover:bg-emerald-500 text-white hover:text-white rounded-full px-8 h-14 text-lg font-medium w-full sm:w-auto group border-none"
               >
                 Try Web Version
                 <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
@@ -123,7 +123,7 @@ export default function Home() {
               <Button
                 size="lg"
                 variant="outline"
-                className="rounded-full px-8 h-14 text-lg font-medium border-zinc-700 hover:bg-zinc-800 text-zinc-50 w-full sm:w-auto"
+                className="rounded-full px-8 h-14 text-lg font-medium border-zinc-700 bg-transparent hover:bg-zinc-800 text-zinc-50 hover:text-white w-full sm:w-auto"
               >
                 <Download className="w-5 h-5 mr-2" />
                 Download Desktop App
@@ -201,7 +201,7 @@ export default function Home() {
           <Link href="https://run.nabla-sim.app">
             <Button
               size="lg"
-              className="bg-white text-zinc-950 hover:bg-zinc-200 rounded-full px-10 h-14 text-lg font-bold"
+              className="bg-emerald-600 text-white hover:bg-emerald-500 hover:text-white rounded-full px-10 h-14 text-lg font-bold border-none"
             >
               Open Simulator
             </Button>
