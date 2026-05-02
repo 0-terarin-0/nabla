@@ -1,9 +1,9 @@
 use axum::{
+    Json, Router,
     extract::{DefaultBodyLimit, Multipart},
     http::{Method, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post},
-    Json, Router,
 };
 use nalgebra::Vector3;
 use rayon::prelude::*;
@@ -75,7 +75,7 @@ async fn main() {
 
 async fn get_default_config() -> Json<DefaultConfigResponse> {
     let config = r#"[Solver]
-name = "nabla-web"
+name = "example"
 dt = 0.01
 t_max = 1000.0
 
@@ -101,7 +101,7 @@ wind_azimuth = 0.0
 wind_power_coeff = 4.5
 wind_alt_ref = 2.0
 exist_wind_file = true
-wind_file = "config/nichikagon_wind.csv"
+wind_file = "wind_example.csv"
 
 [Geometry]
 diameter = 114.0
@@ -131,12 +131,12 @@ mass_fuel_aft = 0.352
 lcg_ox = 136.5
 lcg_fuel = 136.0
 l_tank_cap = 273.0
-thrust_file = "config/thrust_example.csv"
+thrust_file = "thrust_example.csv"
 
 [Parachute]
-vel_para_1st = 8.80
+vel_para_1st = 8.805970788912555
 exist_2nd_para = false
-vel_para_2nd = 12.83
+vel_para_2nd = 12.836678269815902
 2nd_para_timer = false
 alt_para_2nd = 300.0
 time_2nd = 20.0
@@ -144,7 +144,7 @@ time_2nd = 20.0
 [Payload]
 exist_payload = false
 mass_payload = 1.0
-vel_payload = 11.55
+vel_payload = 11.55092245337183
 
 [SafetyArea]
 coordinates = [
@@ -163,7 +163,8 @@ coordinates = [
     [34.282842, 135.091651],
     [34.283453, 135.092365],
     [34.284049, 135.092649]
-]"#.to_string();
+]"#
+    .to_string();
 
     Json(DefaultConfigResponse { config })
 }
@@ -172,9 +173,7 @@ async fn run_simulation(mut multipart: Multipart) -> Result<Json<SimulationRespo
     let mut config_content = String::new();
     let mut is_loop = false;
 
-    let temp_dir = tempfile::Builder::new()
-        .prefix("nabla_sim")
-        .tempdir()?;
+    let temp_dir = tempfile::Builder::new().prefix("nabla_sim").tempdir()?;
     let dir_path = temp_dir.path();
 
     // Recreate the config directory to handle potential relative file paths like `config/thrust.csv`
@@ -239,8 +238,8 @@ async fn run_simulation(mut multipart: Multipart) -> Result<Json<SimulationRespo
     }
 
     // Initialize parameters from the configuration
-    let param = Parameter::new(&config_path)
-        .map_err(|e| format!("Failed to parse config: {}", e))?;
+    let param =
+        Parameter::new(&config_path).map_err(|e| format!("Failed to parse config: {}", e))?;
 
     // Run the simulation (logic identical to Tauri)
     if is_loop {
@@ -370,7 +369,8 @@ async fn run_simulation(mut multipart: Multipart) -> Result<Json<SimulationRespo
     {
         let cursor = Cursor::new(&mut buf);
         let mut zip = zip::ZipWriter::new(cursor);
-        let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+        let options =
+            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
 
         let files = fs::read_dir(dir_path)?;
         for entry in files {

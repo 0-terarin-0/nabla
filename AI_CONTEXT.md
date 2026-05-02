@@ -8,16 +8,20 @@
 - プロジェクト名: Nabla Simulator
 - 概要: Pythonで記述されたロケット飛翔シミュレータ `miniQuabla` を Rust に移植し、さらにデスクトップGUIを搭載したプロジェクト。
 - 現在のフェーズ: GUI (Tauri + Next.js) 実装完了・マルチプラットフォーム対応完了。
-- アーキテクチャ: Cargo Workspace構成 (`nabla-core`: 計算エンジン, `nabla-cli`: CUI, `nabla-tauri`: GUIアプリ)
+- アーキテクチャ: Cargo Workspace構成 (`nabla-core`: 計算エンジン, `nabla-cli`: CUI, `nabla-tauri`: デスクトップGUIアプリ, `nabla-server`: Web APIサーバー)
 - 設定ファイル (Config): TOML形式を標準とし、GUI内のエディタから直接編集可能。またローカルの `.toml` ファイルや `.csv` ファイルをGUIから読み込み・アップロード可能。
 - 実行方法 (Execution): 
   - GUI: `cd nabla-tauri && bun run tauri dev`
   - CUI: `cargo run -p nabla-cli --release -- [設定ファイルのパス]`
+  - API Server: `cd nabla-server && cargo run --release`
 
 ## 完了した主要タスク (Completed Tasks)
 - [x] AI作業ログ用ファイルの作成および文脈の記録
 - [x] Python版 `miniQuabla` のRustへのフルスクラッチ移植（物理モデル、ソルバー、CSV/TOML読み込み、KML/CSV出力）
-- [x] プロジェクトのWorkspace化 (`nabla-core`, `nabla-cli`, `nabla-tauri` への分離)
+- [x] プロジェクトのWorkspace化 (`nabla-core`, `nabla-cli`, `nabla-tauri`, `nabla-server` への分離)
+- [x] Web APIサーバー (`nabla-server`) の構築 (Axum + Tokio)
+  - [x] `multipart/form-data` によるシミュレーション設定・外部ファイルのアップロード受付機能
+  - [x] 計算結果のオンメモリZIP圧縮とKMLコンテンツ等のJSONレスポンス返却機能
 - [x] Tauri + Next.js (Bun) + Tailwind CSS (shadcn/ui) によるデスクトップGUIアプリの構築
 - [x] ダークモードとシステムテーマ切り替えのシームレスな対応
 - [x] GUI 上での TOML ファイルの読み込み（Upload TOML）と直接編集機能の実装
@@ -32,6 +36,7 @@
 - [x] マルチプラットフォーム向けアプリアイコンの自動生成（`app-icon.png`から）とアプリ名の統一（`Nabla`）
 
 ## 決定事項 (Decisions)
+- **APIサーバーの導入**: Tauri (デスクトップアプリ) に依存せず、純粋なWebブラウザ環境や外部システムからでもシミュレーションを実行できるようにするため、`axum` を用いた `nabla-server` クレートを構築。
 - **GUIアーキテクチャ**: 計算エンジンを他のUIにも流用しやすくするため、コアロジックを `nabla-core` に分離し、GUIアプリは Tauri を用いて `nabla-tauri` に構築。
 - **フロントエンド技術**: 開発効率・パフォーマンス・デザイン性を高めるため、Next.js (SSG) + Tailwind CSS (v4) + shadcn/ui を採用。パッケージマネージャは高速な `bun` を使用する。
 - **ファイルパス解決**: `miniQuabla` 特有のハードコードパスを排除し、指定された `base_dir` からの相対パスで外部CSVファイル等を解決するように統一。
@@ -68,3 +73,11 @@
 - `config_example.toml` に `[SafetyArea]` セクションを追加し、指定された15点の座標配列を黒色・半透明のポリゴンとしてマップ上に重畳表示する機能を追加。
 - 発射地点 (Launch Point) を赤いドット(🔴)で表示。
 - `html-to-image` を用い、現在のフライトマップと凡例を `nabla_map_screenshot_xxx.png` として保存するスクリーンショット機能を実装。
+
+### Web APIサーバー (nabla-server) の導入とWeb公開対応
+- `nabla-server` クレートを追加し、AxumとTokioベースのWeb APIサーバーを構築。
+- `/api/config/default` (GET) でデフォルト設定をJSONで返し、`/api/simulate` (POST) でマルチパートフォームによる設定ファイル・CSVのアップロードを受け付けるよう実装。
+- Rustコアでの計算結果（CSV、KML）をオンメモリでZIP圧縮し、KMLのパース結果や発射地点、安全領域(SafetyArea)とともにJSON経由でクライアントに返却するエンドポイントを作成。
+- Web版デプロイに向けて、`nabla-server` 用の `Dockerfile.server` と、HTTPS自動対応のための `docker-compose.yml` (Caddy) を追加。
+- フロントエンド (Next.js) がブラウザ環境で実行された場合のデフォルトAPI通信先を `https://api.nabla-sim.app` に設定。
+- サーバー・Tauri共通のデフォルト設定 (Config) を更新し、Solver名を `example` に、サンプルファイル名を変更、さらに `[SafetyArea]` ブロックをデフォルトで含めるように修正。

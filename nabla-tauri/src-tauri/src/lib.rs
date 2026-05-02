@@ -11,7 +11,7 @@ use zip::write::SimpleFileOptions;
 #[tauri::command]
 fn get_default_config() -> String {
     r#"[Solver]
-name = "nabla-gui"
+name = "example"
 dt = 0.01
 t_max = 1000.0
 
@@ -37,7 +37,7 @@ wind_azimuth = 0.0
 wind_power_coeff = 4.5
 wind_alt_ref = 2.0
 exist_wind_file = true
-wind_file = "config/nichikagon_wind.csv"
+wind_file = "wind_example.csv"
 
 [Geometry]
 diameter = 114.0
@@ -67,12 +67,12 @@ mass_fuel_aft = 0.352
 lcg_ox = 136.5
 lcg_fuel = 136.0
 l_tank_cap = 273.0
-thrust_file = "config/thrust_example.csv"
+thrust_file = "thrust_example.csv"
 
 [Parachute]
-vel_para_1st = 8.80
+vel_para_1st = 8.805970788912555
 exist_2nd_para = false
-vel_para_2nd = 12.83
+vel_para_2nd = 12.836678269815902
 2nd_para_timer = false
 alt_para_2nd = 300.0
 time_2nd = 20.0
@@ -80,7 +80,7 @@ time_2nd = 20.0
 [Payload]
 exist_payload = false
 mass_payload = 1.0
-vel_payload = 11.55
+vel_payload = 11.55092245337183
 
 [SafetyArea]
 coordinates = [
