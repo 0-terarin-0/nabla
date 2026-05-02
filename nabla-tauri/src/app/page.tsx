@@ -2,9 +2,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
-import { invoke } from "@tauri-apps/api/core";
-import { save } from "@tauri-apps/plugin-dialog";
-import { writeFile } from "@tauri-apps/plugin-fs";
 import { useTheme } from "next-themes";
 import {
   Play,
@@ -76,7 +73,13 @@ export default function Home() {
     async function loadConfig() {
       try {
         let defaultConfig = "";
-        if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+        const isTauriEnv =
+          typeof window !== "undefined" &&
+          "__TAURI_INTERNALS__" in window &&
+          (window as any).__TAURI_INTERNALS__ !== undefined;
+
+        if (isTauriEnv) {
+          const { invoke } = await import("@tauri-apps/api/core");
           defaultConfig = await invoke<string>("get_default_config");
         } else {
           const API_BASE =
@@ -151,10 +154,13 @@ export default function Home() {
     try {
       let result: SimulationResult;
       const isTauriEnv =
-        typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+        typeof window !== "undefined" &&
+        "__TAURI_INTERNALS__" in window &&
+        (window as any).__TAURI_INTERNALS__ !== undefined;
 
       if (isTauriEnv) {
         // Invoke Rust backend via Tauri
+        const { invoke } = await import("@tauri-apps/api/core");
         result = await invoke<SimulationResult>("run_simulation", {
           configContent: configText,
           isLoop: isLoop,
@@ -204,6 +210,8 @@ export default function Home() {
         : "nominal_results.zip";
 
       if (isTauriEnv) {
+        const { save } = await import("@tauri-apps/plugin-dialog");
+        const { writeFile } = await import("@tauri-apps/plugin-fs");
         // Prompt user to select a save location via Tauri
         const savePath = await save({
           filters: [{ name: "ZIP Archive", extensions: ["zip"] }],
