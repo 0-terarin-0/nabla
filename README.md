@@ -79,11 +79,11 @@ cargo run -p nabla-cli --release -- nabla-cli/config/config_example.toml --loop
 Nabla Simulator は **TOML 形式** の設定ファイルを使用します。
 GUIの左側にあるエディタで直接記述・編集できるほか、ローカルの `.toml` ファイルをアップロードして読み込ませることも可能です。
 
-### 基本的なセクション構成
+### 詳細なセクション構成とパラメータ
 
 ```toml
 [Solver]
-name = "nabla-gui"
+name = "example"   # シミュレーション名
 dt = 0.01          # 積分ステップ [s]
 t_max = 1000.0     # シミュレーション最大時間 [s]
 
@@ -103,13 +103,74 @@ launch_elevation = 85.0 # 発射仰角 [deg]
 launch_azimuth = 315.0  # 発射方位角 [deg]
 rail_length = 5.0  # ランチャレール長 [m]
 
+[Wind]
+wind_speed = 1.0           # 地上風速 [m/s]
+wind_azimuth = 0.0         # 風向 [deg]
+wind_power_coeff = 4.5     # べき乗則の係数
+wind_alt_ref = 2.0         # 風速基準高度 [m]
+exist_wind_file = true     # 風速の高度分布ファイルを使用するかどうか
+wind_file = "wind_example.csv" # 風速ファイル名
+
+[Geometry]
+diameter = 114.0     # 機体直径 [mm]
+length = 1320.0      # 機体全長 [mm]
+mass_dry = 6.138     # 乾燥質量（推進剤除く）[kg]
+lcg_dry = 780.0      # 乾燥重心位置 [mm]
+Ij_dry_roll = 0.009  # ロール慣性モーメント [kg*m^2]
+Ij_dry_pitch = 1.042 # ピッチ慣性モーメント [kg*m^2]
+
+[Aerodynamics]
+lcp = 540.0          # 圧力中心位置 [mm]
+CA = 0.41            # 軸方向抵抗係数
+CNa = 5.436          # 垂直方向力係数傾斜
+Clp = -0.0296        # ロール減衰モーメント係数
+Cmq = -2.11          # ピッチ減衰モーメント係数
+exsist_lcp_file = false # 以下、マッハ数依存の空力係数ファイルを使用するかどうか
+exsist_CA_file = false
+exsist_CNa_file = false
+lcp_file = ""
+CA_file = ""
+CNa_file = ""
+
+[Engine]
+mass_ox = 0.2739         # 酸化剤質量 [kg]
+mass_fuel_bef = 0.38     # 燃焼前燃料質量 [kg]
+mass_fuel_aft = 0.352    # 燃焼後燃料質量 [kg]
+lcg_ox = 136.5           # 酸化剤重心 [mm]
+lcg_fuel = 136.0         # 燃料重心 [mm]
+l_tank_cap = 273.0       # タンク長さ [mm]
+thrust_file = "thrust_example.csv" # 推力履歴のCSVファイル名
+
+[Parachute]
+vel_para_1st = 8.805   # 第1パラシュートの降下速度 [m/s]
+exist_2nd_para = false # 2段式パラシュートかどうか
+vel_para_2nd = 12.836  # 第2パラシュートの降下速度 [m/s]
+2nd_para_timer = false # タイマー開放かどうか
+alt_para_2nd = 300.0   # 第2パラシュート開放高度 [m]
+time_2nd = 20.0        # 第2パラシュート開放時間 [s]
+
+[Payload]
+exist_payload = false  # ペイロード分離の有無
+mass_payload = 1.0     # ペイロード質量 [kg]
+vel_payload = 11.55    # ペイロード降下速度 [m/s]
+
 [SafetyArea]
 # 保安範囲の座標 (緯度, 経度) の配列。マップ上に黒い半透明ポリゴンとして描画されます。
 coordinates = [
     [34.285604, 135.093313],
+    [34.285698, 135.092503],
     [34.286411, 135.092401],
+    [34.286863, 135.091339],
     [34.287492, 135.089311],
+    [34.286140, 135.088726],
+    [34.286634, 135.087086],
     [34.283611, 135.087193],
+    [34.283675, 135.088155],
+    [34.283486, 135.088878],
+    [34.282289, 135.090412],
+    [34.282672, 135.090973],
+    [34.282842, 135.091651],
+    [34.283453, 135.092365],
     [34.284049, 135.092649]
 ]
 ```
