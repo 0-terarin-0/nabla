@@ -34,6 +34,8 @@
   - [x] 保安範囲 (SafetyArea) の設定追加とマップ上への半透明黒色ポリゴン描画
   - [x] マップのスクリーンショット保存機能（`html-to-image`利用）
 - [x] マルチプラットフォーム向けアプリアイコンの自動生成（`app-icon.png`から）とアプリ名の統一（`Nabla`）
+- [x] GitHub Actions を用いたマルチプラットフォーム (Windows, macOS, Linux) 向けTauri自動ビルドCIの構築
+- [ ] ランディングページ (LP) の作成
 
 ## 決定事項 (Decisions)
 - **APIサーバーの導入**: Tauri (デスクトップアプリ) に依存せず、純粋なWebブラウザ環境や外部システムからでもシミュレーションを実行できるようにするため、`axum` を用いた `nabla-server` クレートを構築。
@@ -78,6 +80,9 @@
 - `nabla-server` クレートを追加し、AxumとTokioベースのWeb APIサーバーを構築。
 - `/api/config/default` (GET) でデフォルト設定をJSONで返し、`/api/simulate` (POST) でマルチパートフォームによる設定ファイル・CSVのアップロードを受け付けるよう実装。
 - Rustコアでの計算結果（CSV、KML）をオンメモリでZIP圧縮し、KMLのパース結果や発射地点、安全領域(SafetyArea)とともにJSON経由でクライアントに返却するエンドポイントを作成。
-- Web版デプロイに向けて、`nabla-server` 用の `Dockerfile.server` と、HTTPS自動対応のための `docker-compose.yml` (Caddy) を追加。
 - フロントエンド (Next.js) がブラウザ環境で実行された場合のデフォルトAPI通信先を `https://api.nabla-sim.app` に設定。
 - サーバー・Tauri共通のデフォルト設定 (Config) を更新し、Solver名を `example` に、サンプルファイル名を変更、さらに `[SafetyArea]` ブロックをデフォルトで含めるように修正。
+
+### CI/CDおよび今後のタスク
+- GitHub Actions を用いて、タグプッシュ時および手動実行時に Windows, macOS, Linux 向けの Tauri アプリを自動ビルドし、GitHub Releases にアップロードするワークフロー (`tauri-build.yml`) を追加。
+- Web版公開に向けたランディングページ (LP) の作成を予定。
