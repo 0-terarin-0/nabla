@@ -1,7 +1,7 @@
 use axum::{
     Json, Router,
     extract::{DefaultBodyLimit, Multipart},
-    http::{HeaderValue, Method, StatusCode},
+    http::{Method, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post},
 };
@@ -53,18 +53,10 @@ where
 
 #[tokio::main]
 async fn main() {
-    let cors = CorsLayer::new()
-        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
-        .allow_headers(Any)
-        .allow_credentials(true)
-        .allow_origin([
-            "http://localhost:3000".parse::<HeaderValue>().unwrap(),
-            "http://localhost:1420".parse::<HeaderValue>().unwrap(),
-            "https://nabla-sim.app".parse::<HeaderValue>().unwrap(),
-            "https://run.nabla-sim.app".parse::<HeaderValue>().unwrap(),
-            "tauri://localhost".parse::<HeaderValue>().unwrap(),
-            "https://tauri.localhost".parse::<HeaderValue>().unwrap(),
-        ]);
+    // Use the most permissive CORS setup to ensure Axum never blocks requests.
+    // Cloudflare fake-CORS errors are often due to 413/502 responses missing CORS headers,
+    // so we make sure the layer is absolutely permissive.
+    let cors = CorsLayer::permissive();
 
     let app = Router::new()
         .route("/health", get(|| async { "OK" }))
@@ -178,6 +170,7 @@ coordinates = [
 }
 
 async fn run_simulation(mut multipart: Multipart) -> Result<Json<SimulationResponse>, AppError> {
+    println!(">>> Incoming request to /api/simulate");
     let mut config_content = String::new();
     let mut is_loop = false;
 
@@ -191,6 +184,7 @@ async fn run_simulation(mut multipart: Multipart) -> Result<Json<SimulationRespo
     // Parse the multipart payload
     while let Some(field) = multipart.next_field().await? {
         let name = field.name().unwrap_or("").to_string();
+        println!(">>> Received multipart field: {}", name);
 
         if name == "configContent" {
             config_content = field.text().await?;
@@ -212,8 +206,14 @@ async fn run_simulation(mut multipart: Multipart) -> Result<Json<SimulationRespo
     }
 
     if config_content.is_empty() {
+        println!(">>> Error: Missing configuration content");
         return Err(AppError("Missing configuration content".to_string()));
     }
+
+    println!(
+        ">>> Configuration parsed successfully ({} bytes). Executing simulation...",
+        config_content.len()
+    );
 
     // Write the provided configuration to a TOML file
     let config_path = dir_path.join("config.toml");
@@ -436,6 +436,7 @@ async fn run_simulation(mut multipart: Multipart) -> Result<Json<SimulationRespo
         }
     }
 
+    println!(">>> Simulation complete. Returning results to client.");
     Ok(Json(SimulationResponse {
         zip_bytes: buf,
         kml_files,
