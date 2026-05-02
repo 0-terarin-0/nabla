@@ -53,10 +53,7 @@ where
 
 #[tokio::main]
 async fn main() {
-    let cors = CorsLayer::new()
-        .allow_methods([Method::GET, Method::POST])
-        .allow_origin(Any)
-        .allow_headers(Any);
+    let cors = CorsLayer::permissive();
 
     let app = Router::new()
         .route("/health", get(|| async { "OK" }))
