@@ -123,7 +123,7 @@ export default function Home() {
               <Button
                 size="lg"
                 variant="outline"
-                className="rounded-full px-8 h-14 text-lg font-medium border-zinc-700 bg-transparent hover:bg-zinc-800 text-zinc-50 hover:text-white w-full sm:w-auto"
+                className="rounded-full px-8 h-14 text-lg font-medium bg-white text-zinc-950 hover:bg-zinc-200 border-none w-full sm:w-auto"
               >
                 <Download className="w-5 h-5 mr-2" />
                 Download Desktop App
