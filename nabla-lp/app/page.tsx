@@ -14,6 +14,7 @@ import {
   FileSpreadsheet,
 } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -71,11 +72,33 @@ export default function Home() {
       <section className="pt-32 pb-20 px-6 relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-emerald-900/20 via-zinc-950 to-zinc-950 -z-10" />
 
-        <div className="max-w-4xl mx-auto text-center mt-12">
+        <div className="max-w-4xl mx-auto text-center mt-6">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{
+              duration: 0.8,
+              ease: [0.16, 1, 0.3, 1], // Custom spring-like easing
+            }}
+            className="relative mb-8 group flex justify-center"
+          >
+            {/* Glow effect behind the logo */}
+            <div className="absolute inset-0 bg-emerald-500/30 blur-[60px] rounded-full scale-[0.8] group-hover:scale-[1.1] group-hover:bg-cyan-500/30 transition-transform duration-700 -z-10 w-48 h-48 mx-auto" />
+
+            <Image
+              src="/app-icon.png"
+              alt="Nabla Simulator Logo"
+              width={160}
+              height={160}
+              priority
+              className="relative rounded-3xl shadow-2xl shadow-black/50 border border-white/5 group-hover:rotate-[-4deg] group-hover:scale-105 transition-all duration-500"
+            />
+          </motion.div>
+
           <motion.div initial="initial" animate="animate" variants={fadeIn}>
             <Badge
               variant="outline"
-              className="mb-6 border-emerald-500/30 text-emerald-400 bg-emerald-500/10 px-4 py-1.5 rounded-full text-sm"
+              className="mb-6 border-emerald-500/30 text-emerald-400 bg-emerald-500/10 px-4 py-1.5 rounded-full text-sm font-medium"
             >
               v1.0.0 is now available
             </Badge>
