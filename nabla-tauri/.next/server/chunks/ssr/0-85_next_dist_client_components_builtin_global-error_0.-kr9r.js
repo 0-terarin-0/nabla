@@ -1,3 +1,0 @@
-module.exports=[2566,(a,b,c)=>{let{createClientModuleProxy:d}=a.r(51726);a.n(d("[project]/nabla/nabla-tauri/node_modules/next/dist/client/components/builtin/global-error.js <module evaluation>"))},97526,(a,b,c)=>{let{createClientModuleProxy:d}=a.r(51726);a.n(d("[project]/nabla/nabla-tauri/node_modules/next/dist/client/components/builtin/global-error.js"))},80953,a=>{"use strict";a.i(2566);var b=a.i(97526);a.n(b)},31316,a=>{a.n(a.i(80953))}];
-
-//# sourceMappingURL=0-85_next_dist_client_components_builtin_global-error_0.-kr9r.js.map

@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
+import { invoke } from "@tauri-apps/api/core";
+import { save } from "@tauri-apps/plugin-dialog";
+import { writeFile } from "@tauri-apps/plugin-fs";
 import { useTheme } from "next-themes";
 import {
   Play,
@@ -14,6 +17,7 @@ import {
   Moon,
   Map as MapIcon,
   Code,
+  Settings,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -28,13 +32,33 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 
-// Dynamically import MapViewer to avoid SSR issues with Leaflet
+// Dynamically import MapViewers to avoid SSR issues
 const MapViewer = dynamic(() => import("@/components/MapViewer"), {
   ssr: false,
   loading: () => (
     <div className="w-full h-full flex items-center justify-center bg-muted/20 text-muted-foreground animate-pulse">
       Loading map...
+    </div>
+  ),
+});
+
+const MapViewerGoogle = dynamic(() => import("@/components/MapViewerGoogle"), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-full flex items-center justify-center bg-muted/20 text-muted-foreground animate-pulse">
+      Loading Google Maps...
     </div>
   ),
 });
@@ -62,34 +86,24 @@ export default function Home() {
   const [safetyArea, setSafetyArea] = useState<[number, number][]>([]);
   const [activeTab, setActiveTab] = useState<string>("editor");
 
+  const [useGoogleMaps, setUseGoogleMaps] = useState<boolean>(false);
+  const [googleApiKey, setGoogleApiKey] = useState<string>("");
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const tomlInputRef = useRef<HTMLInputElement>(null);
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
-  // Fetch default configuration from Rust backend on load
   useEffect(() => {
     setMounted(true);
+    const savedApiKey = localStorage.getItem("googleApiKey");
+    if (savedApiKey) setGoogleApiKey(savedApiKey);
+    const savedUseGoogle = localStorage.getItem("useGoogleMaps");
+    if (savedUseGoogle === "true") setUseGoogleMaps(true);
+
     async function loadConfig() {
       try {
-        let defaultConfig = "";
-        const isTauriEnv =
-          typeof window !== "undefined" &&
-          "__TAURI_INTERNALS__" in window &&
-          (window as any).__TAURI_INTERNALS__ !== undefined;
-
-        if (isTauriEnv) {
-          const { invoke } = await import("@tauri-apps/api/core");
-          defaultConfig = await invoke<string>("get_default_config");
-        } else {
-          const API_BASE =
-            process.env.NEXT_PUBLIC_API_URL || "https://api.nabla-sim.app";
-          const res = await fetch(`${API_BASE}/api/config/default`);
-          if (!res.ok)
-            throw new Error("Failed to fetch default config from server");
-          const data = await res.json();
-          defaultConfig = data.config;
-        }
+        const defaultConfig = await invoke<string>("get_default_config");
         setConfigText(defaultConfig);
       } catch (err) {
         console.error("Failed to load default config:", err);
@@ -99,6 +113,12 @@ export default function Home() {
     }
     loadConfig();
   }, []);
+
+  const handleSaveSettings = () => {
+    localStorage.setItem("googleApiKey", googleApiKey);
+    localStorage.setItem("useGoogleMaps", String(useGoogleMaps));
+    setStatusMsg("Settings saved.");
+  };
 
   const handleTomlUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -124,7 +144,6 @@ export default function Home() {
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const text = await file.text();
-      // Avoid adding duplicates with the same name
       if (!extraFiles.some((f) => f.name === file.name)) {
         newFiles.push({ name: file.name, content: text });
       }
@@ -135,7 +154,6 @@ export default function Home() {
       setStatusMsg(`Added ${newFiles.length} external file(s).`);
     }
 
-    // Reset file input so the same file can be selected again if removed
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -143,7 +161,6 @@ export default function Home() {
     setExtraFiles((prev) => prev.filter((f) => f.name !== nameToRemove));
   };
 
-  // Handle simulation execution, map rendering, and ZIP download
   const runSimulation = async (isLoop: boolean) => {
     setIsSimulating(true);
     setIsError(false);
@@ -152,47 +169,12 @@ export default function Home() {
     );
 
     try {
-      let result: SimulationResult;
-      const isTauriEnv =
-        typeof window !== "undefined" &&
-        "__TAURI_INTERNALS__" in window &&
-        (window as any).__TAURI_INTERNALS__ !== undefined;
+      const result = await invoke<SimulationResult>("run_simulation", {
+        configContent: configText,
+        isLoop: isLoop,
+        extraFiles: extraFiles,
+      });
 
-      if (isTauriEnv) {
-        // Invoke Rust backend via Tauri
-        const { invoke } = await import("@tauri-apps/api/core");
-        result = await invoke<SimulationResult>("run_simulation", {
-          configContent: configText,
-          isLoop: isLoop,
-          extraFiles: extraFiles,
-        });
-      } else {
-        // Use Web API backend
-        const formData = new FormData();
-        formData.append("configContent", configText);
-        formData.append("isLoop", isLoop.toString());
-
-        extraFiles.forEach((file) => {
-          const blob = new Blob([file.content], { type: "text/csv" });
-          formData.append("extraFiles", blob, file.name);
-        });
-
-        const API_BASE =
-          process.env.NEXT_PUBLIC_API_URL || "https://api.nabla-sim.app";
-        const res = await fetch(`${API_BASE}/api/simulate`, {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!res.ok) {
-          const errorText = await res.text();
-          throw new Error(`Server error: ${errorText}`);
-        }
-
-        result = await res.json();
-      }
-
-      // Set KML data and launch pos for map rendering and switch tab
       if (result.kml_files && Object.keys(result.kml_files).length > 0) {
         setKmlData(result.kml_files);
         setLaunchPos(result.launch_pos);
@@ -200,44 +182,19 @@ export default function Home() {
         setActiveTab("map");
       }
 
-      setStatusMsg("Simulation finished.\nPreparing results for download...");
-
-      // Convert number array to Uint8Array for ZIP download
+      setStatusMsg("Simulation finished.\nWaiting for save location...");
       const uint8Array = Uint8Array.from(result.zip_bytes);
 
-      const defaultFileName = isLoop
-        ? "dispersion_results.zip"
-        : "nominal_results.zip";
+      const savePath = await save({
+        filters: [{ name: "ZIP Archive", extensions: ["zip"] }],
+        defaultPath: isLoop ? "dispersion_results.zip" : "nominal_results.zip",
+      });
 
-      if (isTauriEnv) {
-        const { save } = await import("@tauri-apps/plugin-dialog");
-        const { writeFile } = await import("@tauri-apps/plugin-fs");
-        // Prompt user to select a save location via Tauri
-        const savePath = await save({
-          filters: [{ name: "ZIP Archive", extensions: ["zip"] }],
-          defaultPath: defaultFileName,
-        });
-
-        if (savePath) {
-          await writeFile(savePath, uint8Array);
-          setStatusMsg(`Successfully saved results to:\n${savePath}`);
-        } else {
-          setStatusMsg("Simulation finished.\nSave cancelled by user.");
-        }
+      if (savePath) {
+        await writeFile(savePath, uint8Array);
+        setStatusMsg(`Successfully saved results to:\n${savePath}`);
       } else {
-        // Browser download trigger
-        const blob = new Blob([uint8Array], {
-          type: "application/zip",
-        });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = defaultFileName;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        setStatusMsg(`Successfully downloaded results to: ${defaultFileName}`);
+        setStatusMsg("Simulation finished.\nSave cancelled by user.");
       }
     } catch (err) {
       console.error("Simulation error:", err);
@@ -251,40 +208,39 @@ export default function Home() {
   return (
     <main className="h-screen w-screen bg-background text-foreground p-3 flex flex-col items-center justify-center relative transition-colors duration-300 overflow-hidden">
       <div className="w-full max-w-[120rem] grid grid-cols-1 xl:grid-cols-4 gap-4 h-full">
-        {/* Left Column: Tabs (Editor / Map) */}
+        {/* Left Column: Tabs */}
         <div className="xl:col-span-3 flex flex-col min-h-0 overflow-hidden">
           <Tabs
             value={activeTab}
             onValueChange={setActiveTab}
             className="flex-1 flex flex-col min-h-0 overflow-hidden"
           >
-            <TabsList className="grid w-fit grid-cols-2 mb-2 bg-muted/50 p-1">
-              <TabsTrigger
-                value="editor"
-                className="flex items-center gap-2 font-medium px-6"
-              >
-                <Code className="w-4 h-4" />
-                Configuration
-              </TabsTrigger>
-              <TabsTrigger
-                value="map"
-                className="flex items-center gap-2 font-medium px-6"
-              >
-                <MapIcon className="w-4 h-4" />
-                Flight Map
-              </TabsTrigger>
-            </TabsList>
+            <div className="flex items-center justify-between mb-2 shrink-0">
+              <TabsList className="grid w-fit grid-cols-2 bg-muted/50 p-1">
+                <TabsTrigger
+                  value="editor"
+                  className="flex items-center gap-2 font-medium px-6"
+                >
+                  <Code className="w-4 h-4" /> Configuration
+                </TabsTrigger>
+                <TabsTrigger
+                  value="map"
+                  className="flex items-center gap-2 font-medium px-6"
+                >
+                  <MapIcon className="w-4 h-4" /> Flight Map
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
             <TabsContent
               value="editor"
               className="flex-1 min-h-0 mt-0 flex flex-col gap-3 data-[state=active]:flex"
             >
-              {/* TOML Editor */}
               <Card className="flex-1 flex flex-col shadow-sm overflow-hidden min-h-0 bg-card border-border">
                 <CardHeader className="bg-muted/30 border-b border-border py-2 px-4 shrink-0">
                   <div className="flex justify-between items-center">
                     <CardTitle className="flex items-center gap-2 text-base tracking-tight">
-                      <Settings2 className="w-4 h-4 text-muted-foreground" />
+                      <Settings2 className="w-4 h-4 text-muted-foreground" />{" "}
                       Editor
                     </CardTitle>
                     <div>
@@ -303,8 +259,7 @@ export default function Home() {
                         onClick={() => tomlInputRef.current?.click()}
                         disabled={isSimulating}
                       >
-                        <Upload className="w-3.5 h-3.5" />
-                        Upload TOML
+                        <Upload className="w-3.5 h-3.5" /> Upload TOML
                       </Button>
                     </div>
                   </div>
@@ -320,12 +275,11 @@ export default function Home() {
                 </CardContent>
               </Card>
 
-              {/* External CSV Files Upload */}
               <Card className="shrink-0 shadow-sm bg-card border-border">
                 <CardHeader className="bg-muted/30 border-b border-border py-2 px-4">
                   <div className="flex justify-between items-center">
                     <CardTitle className="flex items-center gap-2 text-sm font-bold tracking-tight">
-                      <FileSpreadsheet className="w-4 h-4 text-muted-foreground" />
+                      <FileSpreadsheet className="w-4 h-4 text-muted-foreground" />{" "}
                       External Files (CSV)
                     </CardTitle>
                     <div>
@@ -344,8 +298,7 @@ export default function Home() {
                         onClick={() => fileInputRef.current?.click()}
                         disabled={isSimulating}
                       >
-                        <Upload className="w-3.5 h-3.5" />
-                        Add CSVs
+                        <Upload className="w-3.5 h-3.5" /> Add CSVs
                       </Button>
                     </div>
                   </div>
@@ -353,7 +306,8 @@ export default function Home() {
                 <CardContent className="p-2 min-h-[3rem] flex items-center">
                   {extraFiles.length === 0 ? (
                     <p className="text-xs text-muted-foreground italic text-center w-full">
-                      No external files added.
+                      No external files added. Default configurations will be
+                      used.
                     </p>
                   ) : (
                     <div className="flex flex-wrap gap-1.5">
@@ -363,7 +317,7 @@ export default function Home() {
                           variant="secondary"
                           className="px-2 py-0.5 pr-1 flex items-center gap-1 font-medium text-xs"
                         >
-                          <FileSpreadsheet className="w-3 h-3 text-muted-foreground" />
+                          <FileSpreadsheet className="w-3 h-3 text-muted-foreground" />{" "}
                           {file.name}
                           <button
                             onClick={() => removeFile(file.name)}
@@ -388,11 +342,20 @@ export default function Home() {
               <Card className="flex-1 shadow-sm border-border bg-card overflow-hidden">
                 <div className="w-full h-full relative">
                   {Object.keys(kmlData).length > 0 ? (
-                    <MapViewer
-                      kmlData={kmlData}
-                      launchPos={launchPos}
-                      safetyArea={safetyArea}
-                    />
+                    useGoogleMaps && googleApiKey ? (
+                      <MapViewerGoogle
+                        kmlData={kmlData}
+                        launchPos={launchPos}
+                        safetyArea={safetyArea}
+                        apiKey={googleApiKey}
+                      />
+                    ) : (
+                      <MapViewer
+                        kmlData={kmlData}
+                        launchPos={launchPos}
+                        safetyArea={safetyArea}
+                      />
+                    )
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground bg-muted/10">
                       <MapIcon className="w-12 h-12 mb-4 text-muted-foreground/30" />
@@ -409,79 +372,130 @@ export default function Home() {
         </div>
 
         {/* Right Column: Controls & Log */}
-        <Card className="flex flex-col shadow-sm bg-card border-border overflow-hidden h-full">
-          <CardHeader className="bg-muted/30 border-b border-border pb-4 shrink-0 flex flex-row items-start justify-between">
+        <Card className="w-full lg:w-80 xl:w-96 shrink-0 flex flex-col shadow-sm bg-card border-border overflow-hidden h-full">
+          <CardHeader className="bg-muted/30 border-b border-border py-4 shrink-0 flex flex-row items-start justify-between">
             <div>
               <CardTitle className="flex items-center gap-2 text-lg tracking-tight">
-                <Rocket className="w-5 h-5 text-primary" />
-                Nabla Simulator
+                <Rocket className="w-5 h-5 text-primary" /> Nabla Simulator
               </CardTitle>
-              <CardDescription>Execution & Results</CardDescription>
+              <CardDescription className="text-xs">
+                Execution & Results
+              </CardDescription>
             </div>
-            {mounted && (
-              <Button
-                variant="outline"
-                size="icon"
-                className="rounded-full"
-                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              >
-                {theme === "dark" ? (
-                  <Sun className="h-4 w-4" />
-                ) : (
-                  <Moon className="h-4 w-4" />
-                )}
-                <span className="sr-only">Toggle theme</span>
-              </Button>
-            )}
+            <div className="flex gap-2">
+              {mounted && (
+                <Dialog>
+                  <DialogTrigger>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="rounded-full shadow-sm"
+                    >
+                      <Settings className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                      <DialogTitle>Application Settings</DialogTitle>
+                      <DialogDescription>
+                        Configure map providers and API keys.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <div className="flex items-center justify-between">
+                        <Label
+                          htmlFor="use-google"
+                          className="flex flex-col gap-1 cursor-pointer"
+                        >
+                          <span>Use Google Maps</span>
+                          <span className="font-normal text-[10px] text-muted-foreground">
+                            Requires a valid API key. Fallbacks to Esri if
+                            disabled.
+                          </span>
+                        </Label>
+                        <Switch
+                          id="use-google"
+                          checked={useGoogleMaps}
+                          onCheckedChange={setUseGoogleMaps}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="api-key">Google Maps API Key</Label>
+                        <Input
+                          id="api-key"
+                          type="password"
+                          value={googleApiKey}
+                          onChange={(e) => setGoogleApiKey(e.target.value)}
+                          placeholder="AIzaSy..."
+                          disabled={!useGoogleMaps}
+                        />
+                      </div>
+                    </div>
+                    <Button onClick={handleSaveSettings} className="w-full">
+                      Save Changes
+                    </Button>
+                  </DialogContent>
+                </Dialog>
+              )}
+
+              {mounted && (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="rounded-full shadow-sm"
+                  onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                >
+                  {theme === "dark" ? (
+                    <Sun className="h-4 w-4" />
+                  ) : (
+                    <Moon className="h-4 w-4" />
+                  )}
+                </Button>
+              )}
+            </div>
           </CardHeader>
 
-          <CardContent className="p-6 flex-1 flex flex-col gap-8 overflow-hidden min-h-0">
-            <div className="space-y-4 shrink-0">
+          <CardContent className="p-4 flex-1 flex flex-col gap-6 overflow-hidden min-h-0">
+            <div className="space-y-3 shrink-0">
               <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                 Simulation Controls
               </h3>
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-2.5">
                 <Button
                   className="w-full flex items-center gap-2"
-                  size="lg"
+                  size="default"
                   onClick={() => runSimulation(false)}
                   disabled={isSimulating}
                 >
-                  <Play className="w-4 h-4" />
-                  Run Nominal
+                  <Play className="w-4 h-4" /> Run Nominal
                 </Button>
                 <Button
                   className="w-full flex items-center gap-2 bg-secondary/80 hover:bg-secondary text-secondary-foreground"
                   variant="secondary"
-                  size="lg"
+                  size="default"
                   onClick={() => runSimulation(true)}
                   disabled={isSimulating}
                 >
-                  <Play className="w-4 h-4" />
-                  Run Dispersion (Loop)
+                  <Play className="w-4 h-4" /> Run Dispersion (Loop)
                 </Button>
               </div>
             </div>
 
             <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-              <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3 shrink-0">
+              <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 shrink-0">
                 Status Log
               </h3>
               <div
-                className={`flex-1 rounded-lg p-4 text-sm font-mono whitespace-pre-wrap overflow-y-auto border shadow-inner ${
-                  isError
-                    ? "bg-destructive/10 text-destructive border-destructive/20"
-                    : "bg-zinc-950 text-emerald-400 border-zinc-800"
-                }`}
+                className={`flex-1 rounded-md p-3 text-xs font-mono whitespace-pre-wrap overflow-y-auto border shadow-inner ${isError ? "bg-destructive/10 text-destructive border-destructive/20" : "bg-zinc-950 text-emerald-400 border-zinc-800"}`}
               >
                 {statusMsg}
               </div>
             </div>
           </CardContent>
 
-          <CardFooter className="bg-muted/30 border-t border-border p-4 flex justify-between items-center shrink-0">
+          <CardFooter className="bg-muted/30 border-t border-border p-3 flex justify-between items-center shrink-0">
             <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
-              System Status
+              Status
             </span>
             <Badge
               variant={isSimulating ? "default" : "outline"}

@@ -35,7 +35,7 @@
   - [x] マップのスクリーンショット保存機能（`html-to-image`利用）
 - [x] マルチプラットフォーム向けアプリアイコンの自動生成（`app-icon.png`から）とアプリ名の統一（`Nabla`）
 - [x] GitHub Actions を用いたマルチプラットフォーム (Windows, macOS, Linux) 向けTauri自動ビルドCIの構築
-- [ ] ランディングページ (LP) の作成
+- [x] ランディングページ (LP) の作成と Cloudflare Pages へのデプロイ
 
 ## 決定事項 (Decisions)
 - **APIサーバーの導入**: Tauri (デスクトップアプリ) に依存せず、純粋なWebブラウザ環境や外部システムからでもシミュレーションを実行できるようにするため、`axum` を用いた `nabla-server` クレートを構築。
@@ -83,6 +83,8 @@
 - フロントエンド (Next.js) がブラウザ環境で実行された場合のデフォルトAPI通信先を `https://api.nabla-sim.app` に設定。
 - サーバー・Tauri共通のデフォルト設定 (Config) を更新し、Solver名を `example` に、サンプルファイル名を変更、さらに `[SafetyArea]` ブロックをデフォルトで含めるように修正。
 
-### CI/CDおよび今後のタスク
+### CI/CDとランディングページの公開
 - GitHub Actions を用いて、タグプッシュ時および手動実行時に Windows, macOS, Linux 向けの Tauri アプリを自動ビルドし、GitHub Releases にアップロードするワークフロー (`tauri-build.yml`) を追加。
-- Web版公開に向けたランディングページ (LP) の作成を予定。
+- `nabla-lp` ディレクトリに Next.js (App Router) + Framer Motion を用いたモダンなランディングページを構築。
+- ヒーローセクションにアプリアイコン (`app-icon.png`) を配置し、Glowエフェクト等のリッチな演出を追加。メタデータ（タイトル、ファビコン）を正しく設定。
+- Cloudflare Pages への静的エクスポート (`output: "export"`) のため `next.config.ts` を修正し、`@opennextjs` によるビルド競合を解消して自動デプロイ環境を確立。
