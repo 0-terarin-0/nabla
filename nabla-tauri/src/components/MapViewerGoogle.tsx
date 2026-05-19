@@ -113,7 +113,7 @@ function GeoJsonLoader({
       }
 
       const sourceFile = feature.getProperty("sourceFile") || "";
-      const isParachute = sourceFile.includes("parachute");
+      const isParachute = String(sourceFile).includes("parachute");
 
       const rawColor = feature.getProperty("stroke");
       let color: string =
@@ -263,7 +263,7 @@ export default function MapViewerGoogle({
       try {
         const doc = parser.parseFromString(kmlString, "text/xml");
         const converted = kml(doc) as FeatureCollection;
-        const isParachute = filename.toLowerCase().includes("parachute");
+        const isParachute = String(filename).toLowerCase().includes("parachute");
 
         converted.features.forEach((f) => {
           if (!f.properties) f.properties = {};
