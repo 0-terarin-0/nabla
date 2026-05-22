@@ -1,0 +1,13 @@
+--- nabla-tauri/src/components/MapViewer.tsx
++++ nabla-tauri/src/components/MapViewer.tsx
+@@ -70,6 +70,10 @@
+           <div style="width: 14px; height: 14px; background: #dc2626; border-radius: 50%; border: 1.5px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.4); margin-right: 8px;"></div>
+           <span style="font-weight: 500;">Launch point</span>
+         </div>
++        <div style="display: flex; align-items: center; margin-bottom: 12px;">
++          <div style="width: 14px; height: 14px; background: #3b82f6; border-radius: 50%; border: 1.5px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.4); margin-right: 8px;"></div>
++          <span style="font-weight: 500;">Ignition point</span>
++        </div>
+ 
+         <div style="margin-bottom: 12px;">
+           <div style="display: flex; align-items: center; margin-bottom: 4px;">

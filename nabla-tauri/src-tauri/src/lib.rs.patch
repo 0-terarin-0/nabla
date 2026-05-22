@@ -1,0 +1,14 @@
+--- nabla-tauri/src-tauri/src/lib.rs
++++ nabla-tauri/src-tauri/src/lib.rs
+@@ -241,7 +241,6 @@
+             if azimuths[j] == 0.0 {
+                 let landing_point = if param.para.vel_para_1st > 0.0 { soft } else { hard };
+                 let lla = nabla_core::post_process::ned2llh(&param.launch.llh, &landing_point);
+                 north_wind_points_loop.push((lla[0], lla[1]));
+             }
+         }
+ 
+-        global_north_points = north_wind_points_loop;
+-        export_loop_kml(
+-global_north_points = north_wind_points_loop;
+         export_loop_kml(

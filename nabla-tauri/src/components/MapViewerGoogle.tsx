@@ -9,7 +9,12 @@ import { Layers } from "lucide-react";
 export interface MapViewerProps {
   kmlData: Record<string, string>;
   launchPos?: [number, number] | null;
+  launchRadius?: number;
   safetyArea?: [number, number][];
+  ignitionPos?: [number, number] | null;
+  ignitionRadius?: number;
+  northWindPoints?: [number, number][];
+  northWindPointsTraj?: [number, number][];
   apiKey: string;
 }
 
@@ -20,6 +25,7 @@ type LegendItem = {
   paraColor: string;
 };
 
+// Custom hook to load GeoJSON onto the Google Map
 function GeoJsonLoader({
   geoJsonData,
   safetyArea,
@@ -79,7 +85,7 @@ function GeoJsonLoader({
         ...fc,
         features: fc.features.filter((f) => {
           const sourceFile = f.properties?.sourceFile || "";
-          const isPara = sourceFile.includes("parachute");
+          const isPara = String(sourceFile).includes("parachute");
           if (isPara && !showParachute) return false;
           if (!isPara && !showTrajectory) return false;
           return true;
@@ -196,17 +202,157 @@ function LaunchMarker({ launchPos }: { launchPos: [number, number] }) {
   return null;
 }
 
+function IgnitionMarker({ pos }: { pos: [number, number] }) {
+  const map = useMap();
+  const markerLib = useMapsLibrary("marker");
+
+  useEffect(() => {
+    if (!map || !markerLib) return;
+    const pin = new markerLib.PinElement({
+      background: "#3b82f6",
+      borderColor: "#ffffff",
+      glyphColor: "#3b82f6",
+      scale: 0.8,
+    });
+    const newMarker = new markerLib.AdvancedMarkerElement({
+      map,
+      position: { lat: pos[0], lng: pos[1] },
+      title: "Ignition Point",
+      content: pin.element,
+    });
+    return () => { newMarker.map = null; };
+  }, [map, markerLib, pos]);
+  return null;
+}
+
+function NorthWindMarkers({
+  pointsPara,
+  pointsTraj,
+  showParachute,
+  showTrajectory,
+}: {
+  pointsPara?: [number, number][];
+  pointsTraj?: [number, number][];
+  showParachute: boolean;
+  showTrajectory: boolean;
+}) {
+  const map = useMap();
+  const markerLib = useMapsLibrary("marker");
+
+  useEffect(() => {
+    if (!map || !markerLib) return;
+    const markers: google.maps.marker.AdvancedMarkerElement[] = [];
+
+    if (showParachute && pointsPara && pointsPara.length > 0) {
+      pointsPara.forEach((pos) => {
+        const triangleElement = document.createElement("div");
+        triangleElement.style.width = "0";
+        triangleElement.style.height = "0";
+        triangleElement.style.borderLeft = "6px solid transparent";
+        triangleElement.style.borderRight = "6px solid transparent";
+        triangleElement.style.borderTop = "10px solid #fbbf24"; // Warm color for parachute
+        triangleElement.style.filter = "drop-shadow(0px 1px 2px rgba(0,0,0,0.5))";
+
+        markers.push(
+          new markerLib.AdvancedMarkerElement({
+            map,
+            position: { lat: pos[0], lng: pos[1] },
+            title: "North Wind Landing (Parachute)",
+            content: triangleElement,
+          }),
+        );
+      });
+    }
+
+    if (showTrajectory && pointsTraj && pointsTraj.length > 0) {
+      pointsTraj.forEach((pos) => {
+        const triangleElement = document.createElement("div");
+        triangleElement.style.width = "0";
+        triangleElement.style.height = "0";
+        triangleElement.style.borderLeft = "6px solid transparent";
+        triangleElement.style.borderRight = "6px solid transparent";
+        triangleElement.style.borderTop = "10px solid #22d3ee"; // Cool color for trajectory
+        triangleElement.style.filter = "drop-shadow(0px 1px 2px rgba(0,0,0,0.5))";
+
+        markers.push(
+          new markerLib.AdvancedMarkerElement({
+            map,
+            position: { lat: pos[0], lng: pos[1] },
+            title: "North Wind Landing (Trajectory)",
+            content: triangleElement,
+          }),
+        );
+      });
+    }
+
+    return () => {
+      markers.forEach((m) => (m.map = null));
+    };
+  }, [map, markerLib, pointsPara, pointsTraj, showParachute, showTrajectory]);
+  return null;
+}
+
+function LaunchCircle({ center, radius }: { center: [number, number]; radius: number }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!map || !window.google) return;
+    if (radius <= 0) return;
+    const circle = new window.google.maps.Circle({
+      strokeColor: "#f97316",
+      strokeOpacity: 0.8,
+      strokeWeight: 2,
+      fillColor: "#f97316",
+      fillOpacity: 0.15,
+      map,
+      center: { lat: center[0], lng: center[1] },
+      radius: radius,
+    });
+    return () => { circle.setMap(null); };
+  }, [map, center, radius]);
+  return null;
+}
+
+function IgnitionCircle({ center, radius }: { center: [number, number]; radius: number }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!map || !window.google) return;
+    if (radius <= 0) return;
+    const circle = new window.google.maps.Circle({
+      strokeColor: "#ef4444",
+      strokeOpacity: 0.8,
+      strokeWeight: 2,
+      fillColor: "#ef4444",
+      fillOpacity: 0.15,
+      map,
+      center: { lat: center[0], lng: center[1] },
+      radius: radius,
+    });
+    return () => { circle.setMap(null); };
+  }, [map, center, radius]);
+  return null;
+}
+
 function InnerMap({
   geoJsonFeatures,
   launchPos,
+  launchRadius,
   safetyArea,
+  ignitionPos,
+  ignitionRadius,
+  northWindPoints,
+  northWindPointsTraj,
   showTrajectory,
   showParachute,
   showSafetyArea,
 }: {
   geoJsonFeatures: FeatureCollection[];
   launchPos?: [number, number] | null;
+  launchRadius?: number;
   safetyArea?: [number, number][];
+  ignitionPos?: [number, number] | null;
+  ignitionRadius?: number;
+  northWindPoints?: [number, number][];
+  northWindPointsTraj?: [number, number][];
   showTrajectory: boolean;
   showParachute: boolean;
   showSafetyArea: boolean;
@@ -230,6 +376,15 @@ function InnerMap({
         showSafetyArea={showSafetyArea}
       />
       {launchPos && <LaunchMarker launchPos={launchPos} />}
+      {launchPos && launchRadius && launchRadius > 0 && <LaunchCircle center={launchPos} radius={launchRadius} />}
+      {ignitionPos && <IgnitionMarker pos={ignitionPos} />}
+      {ignitionPos && ignitionRadius && ignitionRadius > 0 && <IgnitionCircle center={ignitionPos} radius={ignitionRadius} />}
+      <NorthWindMarkers 
+        pointsPara={northWindPoints} 
+        pointsTraj={northWindPointsTraj} 
+        showParachute={showParachute}
+        showTrajectory={showTrajectory}
+      />
     </Map>
   );
 }
@@ -237,7 +392,12 @@ function InnerMap({
 export default function MapViewerGoogle({
   kmlData,
   launchPos,
+  launchRadius,
   safetyArea,
+  ignitionPos,
+  ignitionRadius,
+  northWindPoints,
+  northWindPointsTraj,
   apiKey,
 }: MapViewerProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -324,47 +484,32 @@ export default function MapViewerGoogle({
       ref={mapContainerRef}
     >
       <div className="absolute inset-0 pointer-events-none z-[1000] flex flex-col justify-between">
-        <div className="flex justify-end p-4">
+        
+        {/* Top: Layers Control (No screenshot button for Google Maps to avoid CORS taint) */}
+        <div className="flex justify-end p-4 pt-14 px-4 w-full">
           <div className="relative pointer-events-auto">
-            <button
+            <button 
               onClick={() => setShowLayersMenu(!showLayersMenu)}
               className="bg-white hover:bg-slate-50 text-slate-700 w-10 h-10 rounded shadow-[0_1px_4px_rgba(0,0,0,0.3)] border border-black/10 flex items-center justify-center transition-colors"
               title="Layers"
             >
               <Layers className="w-5 h-5" />
             </button>
-
+            
             {showLayersMenu && (
               <div className="absolute top-12 right-0 bg-white p-3 rounded-md shadow-lg border border-slate-200 text-sm font-sans w-48 text-slate-800">
-                <div className="font-bold mb-2 pb-1 border-b border-slate-100">
-                  Map Layers
-                </div>
+                <div className="font-bold mb-2 pb-1 border-b border-slate-100">Map Layers</div>
                 <label className="flex items-center gap-2 mb-2 cursor-pointer hover:bg-slate-50 p-1 rounded">
-                  <input
-                    type="checkbox"
-                    checked={showTrajectory}
-                    onChange={(e) => setShowTrajectory(e.target.checked)}
-                    className="rounded text-blue-600 focus:ring-blue-500"
-                  />
+                  <input type="checkbox" checked={showTrajectory} onChange={(e) => setShowTrajectory(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500" />
                   <span>Trajectory Phase</span>
                 </label>
                 <label className="flex items-center gap-2 mb-2 cursor-pointer hover:bg-slate-50 p-1 rounded">
-                  <input
-                    type="checkbox"
-                    checked={showParachute}
-                    onChange={(e) => setShowParachute(e.target.checked)}
-                    className="rounded text-blue-600 focus:ring-blue-500"
-                  />
+                  <input type="checkbox" checked={showParachute} onChange={(e) => setShowParachute(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500" />
                   <span>Parachute Phase</span>
                 </label>
                 {safetyArea && safetyArea.length > 0 && (
                   <label className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-1 rounded">
-                    <input
-                      type="checkbox"
-                      checked={showSafetyArea}
-                      onChange={(e) => setShowSafetyArea(e.target.checked)}
-                      className="rounded text-blue-600 focus:ring-blue-500"
-                    />
+                    <input type="checkbox" checked={showSafetyArea} onChange={(e) => setShowSafetyArea(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500" />
                     <span>Safety Area</span>
                   </label>
                 )}
@@ -373,58 +518,35 @@ export default function MapViewerGoogle({
           </div>
         </div>
 
+        {/* Bottom Left: Dynamic Legend */}
         {legendData.length > 0 && (
           <div className="flex justify-start pb-6 pl-4">
             <div className="pointer-events-auto bg-white/95 p-4 rounded-lg shadow-[0_2px_10px_rgba(0,0,0,0.2)] text-slate-800 font-sans border border-slate-200/60">
-              <div className="flex items-center gap-2 mb-3">
+              <div className="flex items-center gap-2 mb-2">
                 <div className="w-3.5 h-3.5 rounded-full bg-red-600 shadow-sm border border-red-700"></div>
-                <span className="font-bold text-[15px] tracking-tight">
-                  Launch point
-                </span>
+                <span className="font-bold text-[15px] tracking-tight">Launch point</span>
+              </div>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-3.5 h-3.5 rounded-full bg-blue-500 shadow-sm border border-blue-600"></div>
+                <span className="font-bold text-[15px] tracking-tight">Ignition point</span>
               </div>
               <div className="grid grid-cols-[auto_auto_1fr] gap-x-4 gap-y-1.5 items-center">
-                <div className="text-[10px] font-bold text-center text-slate-400 uppercase tracking-widest pb-1 border-b border-slate-200">
-                  Traj.
-                </div>
-                <div className="text-[10px] font-bold text-center text-slate-400 uppercase tracking-widest pb-1 border-b border-slate-200">
-                  Para.
-                </div>
-                <div className="text-[10px] font-bold text-left text-slate-400 uppercase tracking-widest pb-1 border-b border-slate-200">
-                  Wind
-                </div>
+                <div className="text-[10px] font-bold text-center text-slate-400 uppercase tracking-widest pb-1 border-b border-slate-200">Traj.</div>
+                <div className="text-[10px] font-bold text-center text-slate-400 uppercase tracking-widest pb-1 border-b border-slate-200">Para.</div>
+                <div className="text-[10px] font-bold text-left text-slate-400 uppercase tracking-widest pb-1 border-b border-slate-200">Wind</div>
                 {legendData.map((item) => (
                   <Fragment key={item.speedStr}>
                     <div className="flex items-center w-8" title="Trajectory">
-                      <div
-                        className="h-[2px] flex-1"
-                        style={{ backgroundColor: item.trajColor }}
-                      ></div>
-                      <div
-                        className="w-2.5 h-2.5 rounded-full"
-                        style={{ backgroundColor: item.trajColor }}
-                      ></div>
-                      <div
-                        className="h-[2px] flex-1"
-                        style={{ backgroundColor: item.trajColor }}
-                      ></div>
+                      <div className="h-[2px] flex-1" style={{ backgroundColor: item.trajColor }}></div>
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.trajColor }}></div>
+                      <div className="h-[2px] flex-1" style={{ backgroundColor: item.trajColor }}></div>
                     </div>
                     <div className="flex items-center w-8" title="Parachute">
-                      <div
-                        className="h-[2px] flex-1"
-                        style={{ backgroundColor: item.paraColor }}
-                      ></div>
-                      <div
-                        className="w-2.5 h-2.5 rounded-full"
-                        style={{ backgroundColor: item.paraColor }}
-                      ></div>
-                      <div
-                        className="h-[2px] flex-1"
-                        style={{ backgroundColor: item.paraColor }}
-                      ></div>
+                      <div className="h-[2px] flex-1" style={{ backgroundColor: item.paraColor }}></div>
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.paraColor }}></div>
+                      <div className="h-[2px] flex-1" style={{ backgroundColor: item.paraColor }}></div>
                     </div>
-                    <div className="text-[14px] font-medium ml-1 tabular-nums">
-                      {item.speedStr}
-                    </div>
+                    <div className="text-[14px] font-medium ml-1 tabular-nums">{item.speedStr}</div>
                   </Fragment>
                 ))}
               </div>
@@ -437,7 +559,12 @@ export default function MapViewerGoogle({
         <InnerMap
           geoJsonFeatures={allFeatures}
           launchPos={launchPos}
+          launchRadius={launchRadius}
           safetyArea={safetyArea}
+          ignitionPos={ignitionPos}
+          ignitionRadius={ignitionRadius}
+          northWindPoints={northWindPoints}
+          northWindPointsTraj={northWindPointsTraj}
           showTrajectory={showTrajectory}
           showParachute={showParachute}
           showSafetyArea={showSafetyArea}

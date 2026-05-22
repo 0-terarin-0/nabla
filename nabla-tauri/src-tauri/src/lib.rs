@@ -11,7 +11,7 @@ use zip::write::SimpleFileOptions;
 #[tauri::command]
 fn get_default_config() -> String {
     r#"[Solver]
-name = "example"
+name = "nabla-gui"
 dt = 0.01
 t_max = 1000.0
 
@@ -19,7 +19,7 @@ t_max = 1000.0
 speed_min = 0.0
 speed_step = 1.0
 speed_num = 9
-azimuth_min = 45.0
+azimuth_min = 0.0
 azimuth_num = 16
 
 [Launcher]
@@ -30,6 +30,7 @@ mag_dec = 7.4
 launch_elevation = 85.0
 launch_azimuth = 315.0
 rail_length = 5.0
+radius = 20.0
 
 [Wind]
 wind_speed = 1.0
@@ -37,7 +38,7 @@ wind_azimuth = 0.0
 wind_power_coeff = 4.5
 wind_alt_ref = 2.0
 exist_wind_file = true
-wind_file = "wind_example.csv"
+wind_file = "config/nichikagon_wind.csv"
 
 [Geometry]
 diameter = 114.0
@@ -67,12 +68,12 @@ mass_fuel_aft = 0.352
 lcg_ox = 136.5
 lcg_fuel = 136.0
 l_tank_cap = 273.0
-thrust_file = "thrust_example.csv"
+thrust_file = "config/thrust_example.csv"
 
 [Parachute]
-vel_para_1st = 8.805970788912555
+vel_para_1st = 8.80
 exist_2nd_para = false
-vel_para_2nd = 12.836678269815902
+vel_para_2nd = 12.83
 2nd_para_timer = false
 alt_para_2nd = 300.0
 time_2nd = 20.0
@@ -80,7 +81,7 @@ time_2nd = 20.0
 [Payload]
 exist_payload = false
 mass_payload = 1.0
-vel_payload = 11.55092245337183
+vel_payload = 11.55
 
 [SafetyArea]
 coordinates = [
@@ -99,7 +100,13 @@ coordinates = [
     [34.282842, 135.091651],
     [34.283453, 135.092365],
     [34.284049, 135.092649]
-]"#
+]
+
+[IgnitionArea]
+lat = 34.2860
+lon = 135.0910
+radius = 10.0
+"#
     .to_string()
 }
 
@@ -114,7 +121,12 @@ pub struct SimulationResult {
     zip_bytes: Vec<u8>,
     kml_files: std::collections::HashMap<String, String>,
     launch_pos: (f64, f64),
+    launch_radius: f64,
     safety_area: Vec<Vec<f64>>,
+    ignition_pos: Option<(f64, f64)>,
+    ignition_radius: f64,
+    north_wind_points: Vec<(f64, f64)>,
+    north_wind_points_traj: Vec<(f64, f64)>,
 }
 
 #[tauri::command]
@@ -123,27 +135,22 @@ async fn run_simulation(
     is_loop: bool,
     extra_files: Vec<ExtraFile>,
 ) -> Result<SimulationResult, String> {
-    // 1. Create a temporary directory for this simulation run
     let temp_dir = tempfile::Builder::new()
         .prefix("nabla_sim")
         .tempdir()
         .map_err(|e| e.to_string())?;
     let dir_path = temp_dir.path();
 
-    // 2. Write the provided configuration to a TOML file
     let config_path = dir_path.join("config.toml");
     fs::write(&config_path, &config_content).map_err(|e| e.to_string())?;
 
-    // 3. Copy real external files (thrust, wind, etc.) into the temp directory
-    //    We recreate a 'config' directory inside temp_dir to match the expected relative paths.
     let config_dir_dest = dir_path.join("config");
     fs::create_dir_all(&config_dir_dest).map_err(|e| e.to_string())?;
 
-    // Depending on where `tauri dev` is executed, the workspace root might be relative in different ways
     let possible_src_dirs = vec![
-        PathBuf::from("../../nabla-cli/config"), // cwd is src-tauri
-        PathBuf::from("../nabla-cli/config"),    // cwd is nabla-tauri
-        PathBuf::from("nabla-cli/config"),       // cwd is workspace root
+        PathBuf::from("../../nabla-cli/config"),
+        PathBuf::from("../nabla-cli/config"),
+        PathBuf::from("nabla-cli/config"),
     ];
 
     for src_dir in possible_src_dirs {
@@ -162,7 +169,6 @@ async fn run_simulation(
         }
     }
 
-    // Write extra files provided by the user from the frontend
     for file in extra_files {
         let file_path = dir_path.join(&file.name);
         if let Some(parent) = file_path.parent() {
@@ -171,11 +177,12 @@ async fn run_simulation(
         let _ = fs::write(file_path, file.content);
     }
 
-    // 4. Initialize parameters from the configuration
+    let mut global_north_points = Vec::new();
+    let mut global_north_points_traj = Vec::new();
+
     let param =
         Parameter::new(&config_path).map_err(|e| format!("Failed to parse config: {}", e))?;
 
-    // 5. Run the simulation
     if is_loop {
         let (speeds, azimuths) = param.get_wind_array();
         let mut jobs = Vec::new();
@@ -223,10 +230,24 @@ async fn run_simulation(
 
         let mut pos_hard_matrix = vec![vec![Vector3::zeros(); azimuths.len()]; speeds.len()];
         let mut pos_soft_matrix = vec![vec![Vector3::zeros(); azimuths.len()]; speeds.len()];
+        let mut north_wind_points_loop = Vec::new();
+        let mut north_wind_points_traj_loop = Vec::new();
+
+
 
         for (i, j, hard, soft) in results {
             pos_hard_matrix[i][j] = hard;
             pos_soft_matrix[i][j] = soft;
+            if (azimuths[j] % 360.0).abs() < 1e-6 {
+                let lla_hard = nabla_core::post_process::ned2llh(&param.launch.llh, &hard);
+                north_wind_points_traj_loop.push((lla_hard[0], lla_hard[1]));
+                if param.para.vel_para_1st > 0.0 {
+                    let lla_soft = nabla_core::post_process::ned2llh(&param.launch.llh, &soft);
+                    north_wind_points_loop.push((lla_soft[0], lla_soft[1]));
+                }
+            }
+
+
         }
 
         export_loop_kml(
@@ -237,6 +258,9 @@ async fn run_simulation(
             "ff00aaff",
         )
         .map_err(|e| e.to_string())?;
+
+        global_north_points = north_wind_points_loop;
+        global_north_points_traj = north_wind_points_traj_loop;
 
         export_loop_kml(
             dir_path.join("land_map_parachute.kml").to_str().unwrap(),
@@ -274,7 +298,7 @@ async fn run_simulation(
             &state_log,
         )
         .map_err(|e| e.to_string())?;
-
+        
         export_csv(
             dir_path.join("parachute_log.csv").to_str().unwrap(),
             &time_para,
@@ -302,7 +326,6 @@ async fn run_simulation(
         .map_err(|e| e.to_string())?;
     }
 
-    // 6. Zip all generated output files (.csv and .kml)
     let mut buf = Vec::new();
     let mut kml_files = std::collections::HashMap::new();
     {
@@ -317,7 +340,6 @@ async fn run_simulation(
             let path = entry.path();
             if path.is_file() {
                 let name = path.file_name().unwrap().to_string_lossy().to_string();
-                // Avoid zipping the config.toml and the copied reference csvs like thrust_example.csv
                 if name.ends_with("_log.csv") || name.ends_with(".kml") {
                     zip.start_file(name.clone(), options)
                         .map_err(|e| e.to_string())?;
@@ -341,6 +363,35 @@ async fn run_simulation(
 
     let mut safety_area = Vec::new();
     let mut in_safety_area = false;
+    let mut ignition_radius = 10.0;
+    let mut ignition_pos = None;
+    let mut launch_radius = 0.0;
+
+    if let Ok(toml_val) = toml::from_str::<toml::Value>(&config_content) {
+        if let Some(launcher_val) = toml_val.get("Launcher") {
+            if let Some(r) = launcher_val.get("radius").and_then(|v| v.as_float()) {
+                launch_radius = r;
+            } else if let Some(r) = launcher_val.get("radius").and_then(|v| v.as_integer()) {
+                launch_radius = r as f64;
+            }
+        }
+
+        if let Some(ig_val) = toml_val.get("IgnitionArea") {
+            if let Some(r) = ig_val.get("radius").and_then(|v| v.as_float()) {
+                ignition_radius = r;
+            } else if let Some(r) = ig_val.get("radius").and_then(|v| v.as_integer()) {
+                ignition_radius = r as f64;
+            }
+            
+            if let (Some(lat), Some(lon)) = (
+                ig_val.get("lat").and_then(|v| v.as_float()),
+                ig_val.get("lon").and_then(|v| v.as_float()),
+            ) {
+                ignition_pos = Some((lat, lon));
+            }
+        }
+    }
+
     for line in config_content.lines() {
         let line = line.trim();
         if line.starts_with("[SafetyArea]") {
@@ -373,7 +424,12 @@ async fn run_simulation(
         zip_bytes: buf,
         kml_files,
         launch_pos,
+        launch_radius,
         safety_area,
+        ignition_pos,
+        ignition_radius,
+        north_wind_points: global_north_points,
+        north_wind_points_traj: global_north_points_traj,
     })
 }
 

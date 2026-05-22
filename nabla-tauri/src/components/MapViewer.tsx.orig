@@ -22,17 +22,17 @@ import { Camera } from "lucide-react";
 
 // Fix Leaflet's default icon path issues in React/Webpack environments
 let blueDotIcon: L.DivIcon | undefined;
+
 let redDotIcon: L.DivIcon | undefined;
-let blueTriangleIcon: L.DivIcon | undefined;
-
-let blackTriangleIcon: L.DivIcon | undefined;
-
 if (typeof window !== "undefined") {
   delete (L.Icon.Default.prototype as any)._getIconUrl;
   L.Icon.Default.mergeOptions({
-    iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
-    iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
-    shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
+    iconRetinaUrl:
+      "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
+    iconUrl:
+      "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
+    shadowUrl:
+      "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
   });
 
   blueDotIcon = L.divIcon({
@@ -48,22 +48,9 @@ if (typeof window !== "undefined") {
     iconSize: [12, 12],
     iconAnchor: [6, 6],
   });
-
-  blueTriangleIcon = L.divIcon({
-    className: "bg-transparent",
-    html: `<div style="width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 10px solid #22d3ee; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));"></div>`,
-    iconSize: [12, 10],
-    iconAnchor: [6, 10],
-  });
-
-  blackTriangleIcon = L.divIcon({
-    className: "bg-transparent",
-    html: `<div style="width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 10px solid #000000; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));"></div>`,
-    iconSize: [12, 10],
-    iconAnchor: [6, 10],
-  });
 }
 
+// Helper component to auto-adjust the map view to fit all GeoJSON layers
 function MapBounds({ geoJsonData }: { geoJsonData: FeatureCollection[] }) {
   const map = useMap();
 
@@ -98,26 +85,22 @@ type LegendItem = {
 export interface MapViewerProps {
   kmlData: Record<string, string>;
   launchPos?: [number, number] | null;
-  launchRadius?: number;
   safetyArea?: [number, number][];
-  ignitionPos?: [number, number] | null;
   ignitionRadius?: number;
-  northWindPoints?: [number, number][];
-  northWindPointsTraj?: [number, number][];
+  launchRadius?: number;
+  ignitionPos?: [number, number] | null;
 }
 
 export default function MapViewer({
   kmlData,
   launchPos,
-  launchRadius,
   safetyArea,
-  ignitionPos,
-  ignitionRadius,
-  northWindPoints,
-  northWindPointsTraj,
+  ignitionRadius, launchRadius, ignitionPos,
 }: MapViewerProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
 
+  // Parse the KML strings into GeoJSON objects, grouped by phase
+  // Also extract dynamic colors and wind speeds for the legend
   const { trajectoryFeatures, parachuteFeatures, allFeatures, legendData } =
     useMemo(() => {
       const trajectory: FeatureCollection[] = [];
@@ -152,6 +135,7 @@ export default function MapViewer({
               f.properties.stroke || (isParachute ? "#ff4500" : "#00bfff");
             const name = f.properties.name || "";
 
+            // Extract wind speed from KML name (e.g., "Trajectory - Wind 1.0 m/s")
             const match = name.match(/Wind\s+([\d\.]+)\s+m\/s/i);
             if (match) {
               const speedNum = parseFloat(match[1]);
@@ -161,8 +145,8 @@ export default function MapViewer({
                 legendMap.set(speedNum, {
                   speedNum,
                   speedStr,
-                  trajColor: "#cccccc", 
-                  paraColor: "#cccccc",
+                  trajColor: "#cccccc", // fallback if only parachute exists
+                  paraColor: "#cccccc", // fallback if only trajectory exists
                 });
               }
 
@@ -175,7 +159,9 @@ export default function MapViewer({
             }
           });
 
+          // Reverse the rendering order of features so low wind is drawn last (on top)
           converted.features.reverse();
+
           all.push(converted);
 
           if (isParachute) {
@@ -188,6 +174,7 @@ export default function MapViewer({
         }
       }
 
+      // Sort legend items by wind speed
       const sortedLegendData = Array.from(legendMap.values()).sort(
         (a, b) => a.speedNum - b.speedNum,
       );
@@ -200,8 +187,10 @@ export default function MapViewer({
       };
     }, [kmlData]);
 
+  // Default center (e.g., Wakayama launch site fallback)
   const defaultCenter: [number, number] = [34.2852, 135.09059];
 
+  // Tooltip handler
   const onEachFeature = (feature: any, layer: L.Layer) => {
     if (feature.properties) {
       const name = feature.properties.name;
@@ -223,6 +212,7 @@ export default function MapViewer({
       const isParachute = feature.properties.sourceFile?.includes("parachute");
       let color = feature.properties.stroke;
 
+      // Fallback for single run (which doesn't use export_loop_kml yet)
       if (!color) {
         color = isParachute ? "#ff4500" : "#00bfff";
       }
@@ -231,7 +221,7 @@ export default function MapViewer({
         color: color,
         weight: feature.properties["stroke-width"] || 2,
         opacity: feature.properties["stroke-opacity"] ?? 1.0,
-        fill: false, 
+        fill: false, // Completely remove the fill as requested
       };
     }
     return { color: "#22d3ee", weight: 2, fill: false };
@@ -243,7 +233,7 @@ export default function MapViewer({
       const canvas = await toPng(mapContainerRef.current, {
         filter: (element) =>
           element.classList.contains("no-screenshot") ||
-          element.classList.contains("leaflet-control-zoom"),
+          element.classList.contains("leaflet-control-zoom"), // Hide zoom buttons in screenshot
       });
       const a = document.createElement("a");
       a.href = canvas;
@@ -260,6 +250,12 @@ export default function MapViewer({
       style={{ zIndex: 0 }}
       ref={mapContainerRef}
     >
+      {/*
+        React-based Overlays (Outside of MapContainer).
+        This avoids 'createRoot' and DOM manipulation errors caused by Leaflet.
+      */}
+
+      {/* External Screenshot Button overlay positioned next to zoom controls */}
       <div className="absolute top-4 left-14 z-[1000] no-screenshot">
         <button
           onClick={handleScreenshot}
@@ -270,22 +266,18 @@ export default function MapViewer({
         </button>
       </div>
 
+      {/* Dynamic Legend matching the reference image style */}
       {legendData.length > 0 && (
-        <div className="absolute bottom-6 left-6 z-[1000] bg-white/95 p-4 rounded-lg shadow-[0_2px_10px_rgba(0,0,0,0.2)] text-slate-800 font-sans pointer-events-auto border border-slate-200/60">
-          <div className="flex items-center gap-2 mb-2">
+        <div className="absolute bottom-6 right-6 z-[1000] bg-white/95 p-4 rounded-lg shadow-[0_2px_10px_rgba(0,0,0,0.2)] text-slate-800 font-sans pointer-events-auto border border-slate-200/60">
+          <div className="flex items-center gap-2 mb-3">
             <div className="w-3.5 h-3.5 rounded-full bg-red-600 shadow-sm border border-red-700"></div>
             <span className="font-bold text-[15px] tracking-tight">
               Launch point
             </span>
           </div>
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-3.5 h-3.5 rounded-full bg-blue-500 shadow-sm border border-blue-600"></div>
-            <span className="font-bold text-[15px] tracking-tight">
-              Ignition point
-            </span>
-          </div>
 
           <div className="grid grid-cols-[auto_auto_1fr] gap-x-4 gap-y-1.5 items-center">
+            {/* Legend Table Headers */}
             <div className="text-[10px] font-bold text-center text-slate-400 uppercase tracking-widest pb-1 border-b border-slate-200">
               Traj.
             </div>
@@ -296,20 +288,42 @@ export default function MapViewer({
               Wind
             </div>
 
+            {/* Legend Rows (Parsed dynamically from KML properties) */}
             {legendData.map((item) => (
               <Fragment key={item.speedStr}>
+                {/* Trajectory Style (Cold) */}
                 <div className="flex items-center w-8" title="Trajectory">
-                  <div className="h-[2px] flex-1" style={{ backgroundColor: item.trajColor }}></div>
-                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.trajColor }}></div>
-                  <div className="h-[2px] flex-1" style={{ backgroundColor: item.trajColor }}></div>
+                  <div
+                    className="h-[2px] flex-1"
+                    style={{ backgroundColor: item.trajColor }}
+                  ></div>
+                  <div
+                    className="w-2.5 h-2.5 rounded-full"
+                    style={{ backgroundColor: item.trajColor }}
+                  ></div>
+                  <div
+                    className="h-[2px] flex-1"
+                    style={{ backgroundColor: item.trajColor }}
+                  ></div>
                 </div>
 
+                {/* Parachute Style (Warm) */}
                 <div className="flex items-center w-8" title="Parachute">
-                  <div className="h-[2px] flex-1" style={{ backgroundColor: item.paraColor }}></div>
-                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.paraColor }}></div>
-                  <div className="h-[2px] flex-1" style={{ backgroundColor: item.paraColor }}></div>
+                  <div
+                    className="h-[2px] flex-1"
+                    style={{ backgroundColor: item.paraColor }}
+                  ></div>
+                  <div
+                    className="w-2.5 h-2.5 rounded-full"
+                    style={{ backgroundColor: item.paraColor }}
+                  ></div>
+                  <div
+                    className="h-[2px] flex-1"
+                    style={{ backgroundColor: item.paraColor }}
+                  ></div>
                 </div>
 
+                {/* Wind Speed */}
                 <div className="text-[14px] font-medium ml-1 tabular-nums">
                   {item.speedStr}
                 </div>
@@ -319,18 +333,39 @@ export default function MapViewer({
         </div>
       )}
 
+      {/* Leaflet Map */}
       <MapContainer
-        center={ignitionPos || launchPos || defaultCenter}
+        center={launchPos || defaultCenter}
         zoom={13}
         className="w-full h-full absolute inset-0"
         zoomControl={true}
       >
+        {/* crossOrigin="anonymous" is crucial for html2canvas to capture map tiles securely */}
         <TileLayer
           attribution="Tiles &copy; Esri &mdash; Source: Esri"
           url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
           maxZoom={19}
           crossOrigin="anonymous"
         />
+
+        {launchPos && launchRadius && launchRadius > 0 && (
+          <Circle
+            center={launchPos}
+            radius={launchRadius}
+            pathOptions={{ color: "#f97316", fillColor: "#f97316", fillOpacity: 0.15, weight: 2, dashArray: "4, 4" }}
+          >
+            <Tooltip direction="top" opacity={0.9} sticky className="font-sans font-bold text-orange-700 bg-white border-0 shadow-sm rounded-md px-2 py-1">
+              Launch Area ({launchRadius}m)
+            </Tooltip>
+          </Circle>
+        )}
+n        {ignitionPos && blueDotIcon && (
+          <Marker position={ignitionPos} icon={blueDotIcon}>
+            <Tooltip direction="top" offset={[0, -8]} opacity={0.95} permanent className="font-sans font-bold text-slate-800 bg-white border-0 shadow-sm rounded-md px-2 py-1">
+              Ignition Point
+            </Tooltip>
+          </Marker>
+        )}
 
         <LayersControl position="topright">
           {safetyArea && safetyArea.length > 0 && (
@@ -345,7 +380,12 @@ export default function MapViewer({
                   dashArray: "5, 5",
                 }}
               >
-                <Tooltip direction="top" opacity={0.9} sticky className="font-sans font-bold text-slate-800 bg-white border-0 shadow-sm rounded-md px-2 py-1">
+                <Tooltip
+                  direction="top"
+                  opacity={0.9}
+                  sticky
+                  className="font-sans font-bold text-slate-800 bg-white border-0 shadow-sm rounded-md px-2 py-1"
+                >
                   Safety Area
                 </Tooltip>
               </Polygon>
@@ -381,48 +421,16 @@ export default function MapViewer({
               </FeatureGroup>
             </LayersControl.Overlay>
           )}
-          
-        {northWindPointsTraj && northWindPointsTraj.length > 0 && (
-          <LayersControl.Overlay checked name="North Wind Points (Trajectory)">
-            <FeatureGroup>
-              {northWindPointsTraj.map((pos, idx) => (
-                <Marker key={idx} position={pos} icon={blueTriangleIcon}>
-                  <Tooltip direction="top" opacity={0.9} sticky className="font-sans font-bold text-slate-800 bg-white border-0 shadow-sm rounded-md px-2 py-1">
-                    North Wind Landing (Parachute) (Trajectory)
-                  </Tooltip>
-                </Marker>
-              ))}
-            </FeatureGroup>
-          </LayersControl.Overlay>
-        )}
-
-          {northWindPoints && northWindPoints.length > 0 && (
-            <LayersControl.Overlay checked name="North Wind Points (Parachute)">
-              <FeatureGroup>
-                {northWindPoints.map((pos, idx) => (
-                  <Marker key={idx} position={pos} icon={blackTriangleIcon}>
-                    <Tooltip direction="top" opacity={0.9} sticky className="font-sans font-bold text-slate-800 bg-white border-0 shadow-sm rounded-md px-2 py-1">
-                      North Wind Landing (Parachute)
-                    </Tooltip>
-                  </Marker>
-                ))}
-              </FeatureGroup>
-            </LayersControl.Overlay>
-          )}
         </LayersControl>
 
         <MapBounds geoJsonData={allFeatures} />
 
-        {launchPos && launchRadius && launchRadius > 0 && (
-          <Circle center={launchPos} radius={launchRadius} pathOptions={{ color: "#f97316", fillColor: "#f97316", fillOpacity: 0.15, weight: 2, dashArray: "4, 4" }}>
-            <Tooltip direction="top" opacity={0.9} sticky className="font-sans font-bold text-orange-700 bg-white border-0 shadow-sm rounded-md px-2 py-1">
-              Launch Area ({launchRadius}m)
-            </Tooltip>
-          </Circle>
-        )}
-
-        {ignitionPos && ignitionRadius && ignitionRadius > 0 && (
-          <Circle center={ignitionPos} radius={ignitionRadius} pathOptions={{ color: "#ef4444", fillColor: "#ef4444", fillOpacity: 0.15, weight: 2, dashArray: "4, 4" }}>
+        {ignitionPos && ignitionRadius && (
+          <Circle center={ignitionPos}
+            
+            radius={ignitionRadius}
+            pathOptions={{ color: "#ef4444", fillColor: "#ef4444", fillOpacity: 0.15, weight: 2, dashArray: "4, 4" }}
+          >
             <Tooltip direction="top" opacity={0.9} sticky className="font-sans font-bold text-red-700 bg-white border-0 shadow-sm rounded-md px-2 py-1">
               Ignition Area ({ignitionRadius}m)
             </Tooltip>
@@ -431,16 +439,14 @@ export default function MapViewer({
 
         {launchPos && redDotIcon && (
           <Marker position={launchPos} icon={redDotIcon}>
-             <Tooltip direction="top" offset={[0, -8]} opacity={0.95} permanent className="font-sans font-bold text-slate-800 bg-white border-0 shadow-sm rounded-md px-2 py-1">
+            <Tooltip
+              direction="top"
+              offset={[0, -8]}
+              opacity={0.95}
+              permanent
+              className="font-sans font-bold text-slate-800 bg-white border-0 shadow-sm rounded-md px-2 py-1"
+            >
               Launch point
-            </Tooltip>
-          </Marker>
-        )}
-        
-        {ignitionPos && blueDotIcon && (
-          <Marker position={ignitionPos} icon={blueDotIcon}>
-            <Tooltip direction="top" offset={[0, -8]} opacity={0.95} permanent className="font-sans font-bold text-slate-800 bg-white border-0 shadow-sm rounded-md px-2 py-1">
-              Ignition point
             </Tooltip>
           </Marker>
         )}

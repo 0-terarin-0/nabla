@@ -7,7 +7,7 @@ t_max = 1000.0
 speed_min = 0.0
 speed_step = 1.0
 speed_num = 9
-azimuth_min = 45.0
+azimuth_min = 0.0
 azimuth_num = 16
 
 [Launcher]
@@ -88,3 +88,8 @@ coordinates = [
     [34.283453, 135.092365],
     [34.284049, 135.092649]
 ]
+-e 
+[IgnitionArea]
+lat = 34.2852
+lon = 135.09059
+radius = 10.0

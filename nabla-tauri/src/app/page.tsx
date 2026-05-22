@@ -44,7 +44,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
-// Dynamically import MapViewers to avoid SSR issues
 const MapViewer = dynamic(() => import("@/components/MapViewer"), {
   ssr: false,
   loading: () => (
@@ -73,6 +72,11 @@ interface SimulationResult {
   kml_files: Record<string, string>;
   launch_pos: [number, number];
   safety_area: [number, number][];
+  ignition_pos?: [number, number];
+  launch_radius: number;
+  ignition_radius: number;
+  north_wind_points: [number, number][];
+  north_wind_points_traj: [number, number][];
 }
 
 export default function Home() {
@@ -83,7 +87,16 @@ export default function Home() {
   const [extraFiles, setExtraFiles] = useState<ExtraFile[]>([]);
   const [kmlData, setKmlData] = useState<Record<string, string>>({});
   const [launchPos, setLaunchPos] = useState<[number, number] | null>(null);
+  const [launchRadius, setLaunchRadius] = useState<number>(0.0);
+
   const [safetyArea, setSafetyArea] = useState<[number, number][]>([]);
+  const [ignitionRadius, setIgnitionRadius] = useState<number>(10.0);
+  const [northWindPoints, setNorthWindPoints] = useState<[number, number][]>([]);
+  const [northWindPointsTraj, setNorthWindPointsTraj] = useState<[number, number][]>([]);
+
+
+  const [ignitionPos, setIgnitionPos] = useState<[number, number] | null>(null);
+
   const [activeTab, setActiveTab] = useState<string>("editor");
 
   const [useGoogleMaps, setUseGoogleMaps] = useState<boolean>(false);
@@ -164,9 +177,7 @@ export default function Home() {
   const runSimulation = async (isLoop: boolean) => {
     setIsSimulating(true);
     setIsError(false);
-    setStatusMsg(
-      `Running ${isLoop ? "Dispersion (Loop)" : "Nominal"} simulation...\nThis may take a moment.`,
-    );
+    setStatusMsg(`Running ${isLoop ? "Dispersion (Loop)" : "Nominal"} simulation...\nThis may take a moment.`);
 
     try {
       const result = await invoke<SimulationResult>("run_simulation", {
@@ -178,7 +189,13 @@ export default function Home() {
       if (result.kml_files && Object.keys(result.kml_files).length > 0) {
         setKmlData(result.kml_files);
         setLaunchPos(result.launch_pos);
+        setLaunchRadius(result.launch_radius || 0.0);
         setSafetyArea(result.safety_area || []);
+        setIgnitionRadius(result.ignition_radius || 10.0);
+        setNorthWindPoints(result.north_wind_points || []);
+        setNorthWindPointsTraj(result.north_wind_points_traj || []);
+
+        setIgnitionPos(result.ignition_pos || null);
         setActiveTab("map");
       }
 
@@ -208,57 +225,29 @@ export default function Home() {
   return (
     <main className="h-screen w-screen bg-background text-foreground p-3 flex flex-col items-center justify-center relative transition-colors duration-300 overflow-hidden">
       <div className="w-full max-w-[120rem] grid grid-cols-1 xl:grid-cols-4 gap-4 h-full">
-        {/* Left Column: Tabs */}
         <div className="xl:col-span-3 flex flex-col min-h-0 overflow-hidden">
-          <Tabs
-            value={activeTab}
-            onValueChange={setActiveTab}
-            className="flex-1 flex flex-col min-h-0 overflow-hidden"
-          >
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0 overflow-hidden">
             <div className="flex items-center justify-between mb-2 shrink-0">
               <TabsList className="grid w-fit grid-cols-2 bg-muted/50 p-1">
-                <TabsTrigger
-                  value="editor"
-                  className="flex items-center gap-2 font-medium px-6"
-                >
+                <TabsTrigger value="editor" className="flex items-center gap-2 font-medium px-6">
                   <Code className="w-4 h-4" /> Configuration
                 </TabsTrigger>
-                <TabsTrigger
-                  value="map"
-                  className="flex items-center gap-2 font-medium px-6"
-                >
+                <TabsTrigger value="map" className="flex items-center gap-2 font-medium px-6">
                   <MapIcon className="w-4 h-4" /> Flight Map
                 </TabsTrigger>
               </TabsList>
             </div>
 
-            <TabsContent
-              value="editor"
-              className="flex-1 min-h-0 mt-0 flex flex-col gap-3 data-[state=active]:flex"
-            >
+            <TabsContent value="editor" className="flex-1 min-h-0 mt-0 flex flex-col gap-3 data-[state=active]:flex">
               <Card className="flex-1 flex flex-col shadow-sm overflow-hidden min-h-0 bg-card border-border">
                 <CardHeader className="bg-muted/30 border-b border-border py-2 px-4 shrink-0">
                   <div className="flex justify-between items-center">
                     <CardTitle className="flex items-center gap-2 text-base tracking-tight">
-                      <Settings2 className="w-4 h-4 text-muted-foreground" />{" "}
-                      Editor
+                      <Settings2 className="w-4 h-4 text-muted-foreground" /> Editor
                     </CardTitle>
                     <div>
-                      <input
-                        type="file"
-                        accept=".toml,.txt"
-                        className="hidden"
-                        ref={tomlInputRef}
-                        onChange={handleTomlUpload}
-                        disabled={isSimulating}
-                      />
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 gap-1 text-xs px-2 bg-background"
-                        onClick={() => tomlInputRef.current?.click()}
-                        disabled={isSimulating}
-                      >
+                      <input type="file" accept=".toml,.txt" className="hidden" ref={tomlInputRef} onChange={handleTomlUpload} disabled={isSimulating} />
+                      <Button variant="outline" size="sm" className="h-7 gap-1 text-xs px-2 bg-background" onClick={() => tomlInputRef.current?.click()} disabled={isSimulating}>
                         <Upload className="w-3.5 h-3.5" /> Upload TOML
                       </Button>
                     </div>
@@ -279,25 +268,11 @@ export default function Home() {
                 <CardHeader className="bg-muted/30 border-b border-border py-2 px-4">
                   <div className="flex justify-between items-center">
                     <CardTitle className="flex items-center gap-2 text-sm font-bold tracking-tight">
-                      <FileSpreadsheet className="w-4 h-4 text-muted-foreground" />{" "}
-                      External Files (CSV)
+                      <FileSpreadsheet className="w-4 h-4 text-muted-foreground" /> External Files (CSV)
                     </CardTitle>
                     <div>
-                      <input
-                        type="file"
-                        multiple
-                        accept=".csv"
-                        className="hidden"
-                        ref={fileInputRef}
-                        onChange={handleFileUpload}
-                      />
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 gap-1 text-xs px-2 bg-background"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={isSimulating}
-                      >
+                      <input type="file" multiple accept=".csv" className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
+                      <Button variant="outline" size="sm" className="h-7 gap-1 text-xs px-2 bg-background" onClick={() => fileInputRef.current?.click()} disabled={isSimulating}>
                         <Upload className="w-3.5 h-3.5" /> Add CSVs
                       </Button>
                     </div>
@@ -305,26 +280,13 @@ export default function Home() {
                 </CardHeader>
                 <CardContent className="p-2 min-h-[3rem] flex items-center">
                   {extraFiles.length === 0 ? (
-                    <p className="text-xs text-muted-foreground italic text-center w-full">
-                      No external files added. Default configurations will be
-                      used.
-                    </p>
+                    <p className="text-xs text-muted-foreground italic text-center w-full">No external files added. Default configurations will be used.</p>
                   ) : (
                     <div className="flex flex-wrap gap-1.5">
                       {extraFiles.map((file) => (
-                        <Badge
-                          key={file.name}
-                          variant="secondary"
-                          className="px-2 py-0.5 pr-1 flex items-center gap-1 font-medium text-xs"
-                        >
-                          <FileSpreadsheet className="w-3 h-3 text-muted-foreground" />{" "}
-                          {file.name}
-                          <button
-                            onClick={() => removeFile(file.name)}
-                            className="ml-1 rounded-full p-0.5 hover:bg-muted-foreground/20 transition-colors"
-                            disabled={isSimulating}
-                            title="Remove file"
-                          >
+                        <Badge key={file.name} variant="secondary" className="px-2 py-0.5 pr-1 flex items-center gap-1 font-medium text-xs">
+                          <FileSpreadsheet className="w-3 h-3 text-muted-foreground" /> {file.name}
+                          <button onClick={() => removeFile(file.name)} className="ml-1 rounded-full p-0.5 hover:bg-muted-foreground/20 transition-colors" disabled={isSimulating} title="Remove file">
                             <X className="w-3 h-3 text-muted-foreground" />
                           </button>
                         </Badge>
@@ -335,34 +297,20 @@ export default function Home() {
               </Card>
             </TabsContent>
 
-            <TabsContent
-              value="map"
-              className="flex-1 flex flex-col min-h-0 mt-0 data-[state=active]:flex"
-            >
+            <TabsContent value="map" className="flex-1 flex flex-col min-h-0 mt-0 data-[state=active]:flex">
               <Card className="flex-1 shadow-sm border-border bg-card overflow-hidden">
                 <div className="w-full h-full relative">
                   {Object.keys(kmlData).length > 0 ? (
                     useGoogleMaps && googleApiKey ? (
-                      <MapViewerGoogle
-                        kmlData={kmlData}
-                        launchPos={launchPos}
-                        safetyArea={safetyArea}
-                        apiKey={googleApiKey}
-                      />
+                      <MapViewerGoogle kmlData={kmlData} launchPos={launchPos} safetyArea={safetyArea} ignitionRadius={ignitionRadius} northWindPoints={northWindPoints} northWindPointsTraj={northWindPointsTraj} launchRadius={launchRadius} ignitionPos={ignitionPos} apiKey={googleApiKey} />
                     ) : (
-                      <MapViewer
-                        kmlData={kmlData}
-                        launchPos={launchPos}
-                        safetyArea={safetyArea}
-                      />
+                      <MapViewer kmlData={kmlData} launchPos={launchPos} safetyArea={safetyArea} ignitionRadius={ignitionRadius} northWindPoints={northWindPoints} northWindPointsTraj={northWindPointsTraj} launchRadius={launchRadius} ignitionPos={ignitionPos} />
                     )
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground bg-muted/10">
                       <MapIcon className="w-12 h-12 mb-4 text-muted-foreground/30" />
                       <p>No map data available.</p>
-                      <p className="text-sm">
-                        Run a simulation to view the trajectory.
-                      </p>
+                      <p className="text-sm">Run a simulation to view the trajectory.</p>
                     </div>
                   )}
                 </div>
@@ -371,85 +319,56 @@ export default function Home() {
           </Tabs>
         </div>
 
-        {/* Right Column: Controls & Log */}
         <Card className="w-full lg:w-80 xl:w-96 shrink-0 flex flex-col shadow-sm bg-card border-border overflow-hidden h-full">
           <CardHeader className="bg-muted/30 border-b border-border py-4 shrink-0 flex flex-row items-start justify-between">
             <div>
               <CardTitle className="flex items-center gap-2 text-lg tracking-tight">
                 <Rocket className="w-5 h-5 text-primary" /> Nabla Simulator
               </CardTitle>
-              <CardDescription className="text-xs">
-                Execution & Results
-              </CardDescription>
+              <CardDescription className="text-xs">Execution & Results</CardDescription>
             </div>
+            
             <div className="flex gap-2">
               {mounted && (
                 <Dialog>
                   <DialogTrigger>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="rounded-full shadow-sm"
-                    >
+                    <div className="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 w-9 rounded-full cursor-pointer">
                       <Settings className="h-4 w-4 text-muted-foreground" />
-                    </Button>
+                    </div>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-[425px]">
                     <DialogHeader>
                       <DialogTitle>Application Settings</DialogTitle>
-                      <DialogDescription>
-                        Configure map providers and API keys.
-                      </DialogDescription>
+                      <DialogDescription>Configure map providers and API keys.</DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
                       <div className="flex items-center justify-between">
-                        <Label
-                          htmlFor="use-google"
-                          className="flex flex-col gap-1 cursor-pointer"
-                        >
+                        <Label htmlFor="use-google" className="flex flex-col gap-1 cursor-pointer">
                           <span>Use Google Maps</span>
-                          <span className="font-normal text-[10px] text-muted-foreground">
-                            Requires a valid API key. Fallbacks to Esri if
-                            disabled.
-                          </span>
+                          <span className="font-normal text-[10px] text-muted-foreground">Requires a valid API key. Fallbacks to Esri if disabled.</span>
                         </Label>
-                        <Switch
-                          id="use-google"
-                          checked={useGoogleMaps}
-                          onCheckedChange={setUseGoogleMaps}
-                        />
+                        <Switch id="use-google" checked={useGoogleMaps} onCheckedChange={setUseGoogleMaps} />
                       </div>
                       <div className="grid gap-2">
                         <Label htmlFor="api-key">Google Maps API Key</Label>
-                        <Input
-                          id="api-key"
+                        <Input 
+                          id="api-key" 
                           type="password"
-                          value={googleApiKey}
-                          onChange={(e) => setGoogleApiKey(e.target.value)}
-                          placeholder="AIzaSy..."
+                          value={googleApiKey} 
+                          onChange={(e) => setGoogleApiKey(e.target.value)} 
+                          placeholder="AIzaSy..." 
                           disabled={!useGoogleMaps}
                         />
                       </div>
                     </div>
-                    <Button onClick={handleSaveSettings} className="w-full">
-                      Save Changes
-                    </Button>
+                    <Button onClick={handleSaveSettings} className="w-full">Save Changes</Button>
                   </DialogContent>
                 </Dialog>
               )}
 
               {mounted && (
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="rounded-full shadow-sm"
-                  onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                >
-                  {theme === "dark" ? (
-                    <Sun className="h-4 w-4" />
-                  ) : (
-                    <Moon className="h-4 w-4" />
-                  )}
+                <Button variant="outline" size="icon" className="rounded-full shadow-sm" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
+                  {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
                 </Button>
               )}
             </div>
@@ -457,52 +376,28 @@ export default function Home() {
 
           <CardContent className="p-4 flex-1 flex flex-col gap-6 overflow-hidden min-h-0">
             <div className="space-y-3 shrink-0">
-              <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                Simulation Controls
-              </h3>
+              <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Simulation Controls</h3>
               <div className="flex flex-col gap-2.5">
-                <Button
-                  className="w-full flex items-center gap-2"
-                  size="default"
-                  onClick={() => runSimulation(false)}
-                  disabled={isSimulating}
-                >
+                <Button className="w-full flex items-center gap-2" size="default" onClick={() => runSimulation(false)} disabled={isSimulating}>
                   <Play className="w-4 h-4" /> Run Nominal
                 </Button>
-                <Button
-                  className="w-full flex items-center gap-2 bg-secondary/80 hover:bg-secondary text-secondary-foreground"
-                  variant="secondary"
-                  size="default"
-                  onClick={() => runSimulation(true)}
-                  disabled={isSimulating}
-                >
+                <Button className="w-full flex items-center gap-2 bg-secondary/80 hover:bg-secondary text-secondary-foreground" variant="secondary" size="default" onClick={() => runSimulation(true)} disabled={isSimulating}>
                   <Play className="w-4 h-4" /> Run Dispersion (Loop)
                 </Button>
               </div>
             </div>
 
             <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-              <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 shrink-0">
-                Status Log
-              </h3>
-              <div
-                className={`flex-1 rounded-md p-3 text-xs font-mono whitespace-pre-wrap overflow-y-auto border shadow-inner ${isError ? "bg-destructive/10 text-destructive border-destructive/20" : "bg-zinc-950 text-emerald-400 border-zinc-800"}`}
-              >
+              <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 shrink-0">Status Log</h3>
+              <div className={`flex-1 rounded-md p-3 text-xs font-mono whitespace-pre-wrap overflow-y-auto border shadow-inner ${isError ? "bg-destructive/10 text-destructive border-destructive/20" : "bg-zinc-950 text-emerald-400 border-zinc-800"}`}>
                 {statusMsg}
               </div>
             </div>
           </CardContent>
 
           <CardFooter className="bg-muted/30 border-t border-border p-3 flex justify-between items-center shrink-0">
-            <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
-              Status
-            </span>
-            <Badge
-              variant={isSimulating ? "default" : "outline"}
-              className={
-                isSimulating ? "animate-pulse" : "text-muted-foreground"
-              }
-            >
+            <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Status</span>
+            <Badge variant={isSimulating ? "default" : "outline"} className={isSimulating ? "animate-pulse" : "text-muted-foreground"}>
               {isSimulating ? "Computing..." : "Idle"}
             </Badge>
           </CardFooter>
