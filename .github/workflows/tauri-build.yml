@@ -54,5 +54,5 @@ jobs:
           tagName: v__VERSION__
           releaseName: "Nabla Simulator v__VERSION__"
           releaseBody: "Automated release build."
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
