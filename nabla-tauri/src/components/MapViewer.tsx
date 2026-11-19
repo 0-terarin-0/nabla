@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, Fragment } from "react";
+import { useEffect, useMemo, useRef, useState, Fragment } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -17,8 +17,10 @@ import "leaflet/dist/leaflet.css";
 import { kml } from "@tmcw/togeojson";
 import L from "leaflet";
 import type { FeatureCollection } from "geojson";
-import { toPng } from "html-to-image";
-import { Camera } from "lucide-react";
+import { toBlob } from "html-to-image";
+import { Camera, Loader2 } from "lucide-react";
+import { save } from "@tauri-apps/plugin-dialog";
+import { writeFile } from "@tauri-apps/plugin-fs";
 
 // Fix Leaflet's default icon path issues in React/Webpack environments
 let blueDotIcon: L.DivIcon | undefined;
@@ -237,20 +239,40 @@ export default function MapViewer({
     return { color: "#22d3ee", weight: 2, fill: false };
   };
 
+  const [isCapturing, setIsCapturing] = useState(false);
+
   const handleScreenshot = async () => {
-    if (!mapContainerRef.current) return;
+    const node = mapContainerRef.current;
+    if (!node || isCapturing) return;
+    setIsCapturing(true);
     try {
-      const canvas = await toPng(mapContainerRef.current, {
-        filter: (element) =>
-          element.classList.contains("no-screenshot") ||
-          element.classList.contains("leaflet-control-zoom"),
+      const blob = await toBlob(node, {
+        pixelRatio: Math.max(window.devicePixelRatio || 1, 2),
+        backgroundColor: "#0f172a",
+        // Return true to KEEP a node. Exclude UI controls from the image.
+        filter: (n) =>
+          !(
+            n instanceof Element &&
+            (n.classList.contains("no-screenshot") ||
+              n.classList.contains("leaflet-control-zoom") ||
+              n.classList.contains("leaflet-control-layers"))
+          ),
       });
-      const a = document.createElement("a");
-      a.href = canvas;
-      a.download = `nabla_map_screenshot_${new Date().getTime()}.png`;
-      a.click();
+      if (!blob) throw new Error("Failed to render map image.");
+
+      const ts = new Date().toISOString().replace(/[-:]/g, "").replace("T", "_").slice(0, 15);
+      const savePath = await save({
+        filters: [{ name: "PNG Image", extensions: ["png"] }],
+        defaultPath: `nabla_map_${ts}.png`,
+      });
+      if (!savePath) return;
+
+      await writeFile(savePath, new Uint8Array(await blob.arrayBuffer()));
     } catch (err) {
       console.error("Screenshot failed", err);
+      alert(`Screenshot failed:\n${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setIsCapturing(false);
     }
   };
 
@@ -263,10 +285,11 @@ export default function MapViewer({
       <div className="absolute top-4 left-14 z-[1000] no-screenshot">
         <button
           onClick={handleScreenshot}
-          className="bg-white hover:bg-slate-50 text-slate-700 w-[34px] h-[34px] rounded-[4px] shadow-[0_1px_4px_rgba(0,0,0,0.3)] border-[2px] border-black/10 flex items-center justify-center transition-colors"
+          disabled={isCapturing}
+          className="bg-white hover:bg-slate-50 text-slate-700 w-[34px] h-[34px] rounded-[4px] shadow-[0_1px_4px_rgba(0,0,0,0.3)] border-[2px] border-black/10 flex items-center justify-center transition-colors disabled:opacity-70 disabled:cursor-wait"
           title="Save Screenshot"
         >
-          <Camera className="w-4 h-4" />
+          {isCapturing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
         </button>
       </div>
 
