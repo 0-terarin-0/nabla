@@ -2,9 +2,14 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import dynamic from "next/dynamic";
-import { invoke } from "@tauri-apps/api/core";
-import { save } from "@tauri-apps/plugin-dialog";
-import { writeFile } from "@tauri-apps/plugin-fs";
+import {
+  getDefaultConfig,
+  runSimulation as runBackendSimulation,
+  saveFile,
+  isTauri,
+  API_BASE,
+  type ExtraFile,
+} from "@/lib/backend";
 import { useTheme } from "next-themes";
 import {
   Play,
@@ -42,11 +47,6 @@ const MapViewerGoogle = dynamic(() => import("@/components/MapViewerGoogle"), {
   ssr: false,
   loading: () => <MapLoading label="Loading Google Maps..." />,
 });
-
-interface ExtraFile {
-  name: string;
-  content: string;
-}
 
 interface SimulationResult {
   zip_bytes: number[];
@@ -129,9 +129,13 @@ export default function Home() {
 
     (async () => {
       try {
-        const defaultConfig = await invoke<string>("get_default_config");
+        const defaultConfig = await getDefaultConfig();
         setConfigText(defaultConfig);
-        log("System ready. Default configuration loaded.");
+        log(
+          isTauri()
+            ? "System ready. Default configuration loaded."
+            : `System ready (web mode, server: ${API_BASE}). Default configuration loaded.`,
+        );
       } catch (err) {
         console.error("Failed to load default config:", err);
         log(`Failed to load default configuration: ${err}`, "error");
@@ -189,12 +193,12 @@ export default function Home() {
   };
 
   const saveResult = async (result: LastResult) => {
-    const savePath = await save({
-      filters: [{ name: "ZIP Archive", extensions: ["zip"] }],
-      defaultPath: result.isLoop ? "dispersion_results.zip" : "nominal_results.zip",
-    });
+    const savePath = await saveFile(
+      result.bytes,
+      result.isLoop ? "dispersion_results.zip" : "nominal_results.zip",
+      { name: "ZIP Archive", extensions: ["zip"] },
+    );
     if (savePath) {
-      await writeFile(savePath, result.bytes);
       log(`Saved results to ${savePath}`, "success");
     } else {
       log("Save cancelled. Use “Save Results” to export later.");
@@ -219,11 +223,7 @@ export default function Home() {
     const started = performance.now();
 
     try {
-      const result = await invoke<SimulationResult>("run_simulation", {
-        configContent: configText,
-        isLoop,
-        extraFiles,
-      });
+      const result = await runBackendSimulation<SimulationResult>(configText, isLoop, extraFiles);
 
       const elapsed = ((performance.now() - started) / 1000).toFixed(2);
       log(`${label} simulation finished in ${elapsed}s.`, "success");

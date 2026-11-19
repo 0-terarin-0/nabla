@@ -19,8 +19,7 @@ import L from "leaflet";
 import type { FeatureCollection } from "geojson";
 import { toBlob } from "html-to-image";
 import { Camera, Loader2 } from "lucide-react";
-import { save } from "@tauri-apps/plugin-dialog";
-import { writeFile } from "@tauri-apps/plugin-fs";
+import { saveFile } from "@/lib/backend";
 
 // Fix Leaflet's default icon path issues in React/Webpack environments
 let blueDotIcon: L.DivIcon | undefined;
@@ -261,13 +260,7 @@ export default function MapViewer({
       if (!blob) throw new Error("Failed to render map image.");
 
       const ts = new Date().toISOString().replace(/[-:]/g, "").replace("T", "_").slice(0, 15);
-      const savePath = await save({
-        filters: [{ name: "PNG Image", extensions: ["png"] }],
-        defaultPath: `nabla_map_${ts}.png`,
-      });
-      if (!savePath) return;
-
-      await writeFile(savePath, new Uint8Array(await blob.arrayBuffer()));
+      await saveFile(blob, `nabla_map_${ts}.png`, { name: "PNG Image", extensions: ["png"] });
     } catch (err) {
       console.error("Screenshot failed", err);
       alert(`Screenshot failed:\n${err instanceof Error ? err.message : String(err)}`);
