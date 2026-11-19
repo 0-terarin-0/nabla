@@ -1,10 +1,20 @@
 "use client";
 
-import { useEffect, useMemo, useRef, Fragment, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { APIProvider, Map, useMap, useMapsLibrary } from "@vis.gl/react-google-maps";
-import { kml } from "@tmcw/togeojson";
 import type { FeatureCollection } from "geojson";
 import { Layers } from "lucide-react";
+import {
+  COLORS,
+  formatDeclination,
+  magneticNorthLine,
+  parseDispersionKml,
+  triangleSvg,
+  type LandingPoint,
+  type LatLng,
+  type NorthWindPoint,
+} from "@/lib/dispersion";
+import { DispersionLegend, NorthIndicator } from "@/components/DispersionLegend";
 
 export interface MapViewerProps {
   kmlData: Record<string, string>;
@@ -13,17 +23,12 @@ export interface MapViewerProps {
   safetyArea?: [number, number][];
   ignitionPos?: [number, number] | null;
   ignitionRadius?: number;
-  northWindPoints?: [number, number][];
-  northWindPointsTraj?: [number, number][];
+  northWindPoints?: NorthWindPoint[];
+  northWindPointsTraj?: NorthWindPoint[];
+  magDec?: number | null;
+  totalImpulse?: number | null;
   apiKey: string;
 }
-
-type LegendItem = {
-  speedNum: number;
-  speedStr: string;
-  trajColor: string;
-  paraColor: string;
-};
 
 // Custom hook to load GeoJSON onto the Google Map
 function GeoJsonLoader({
@@ -231,8 +236,8 @@ function NorthWindMarkers({
   showParachute,
   showTrajectory,
 }: {
-  pointsPara?: [number, number][];
-  pointsTraj?: [number, number][];
+  pointsPara?: NorthWindPoint[];
+  pointsTraj?: NorthWindPoint[];
   showParachute: boolean;
   showTrajectory: boolean;
 }) {
@@ -243,52 +248,102 @@ function NorthWindMarkers({
     if (!map || !markerLib) return;
     const markers: google.maps.marker.AdvancedMarkerElement[] = [];
 
-    if (showParachute && pointsPara && pointsPara.length > 0) {
-      pointsPara.forEach((pos) => {
-        const triangleElement = document.createElement("div");
-        triangleElement.style.width = "0";
-        triangleElement.style.height = "0";
-        triangleElement.style.borderLeft = "6px solid transparent";
-        triangleElement.style.borderRight = "6px solid transparent";
-        triangleElement.style.borderTop = "10px solid #fbbf24"; // Warm color for parachute
-        triangleElement.style.filter = "drop-shadow(0px 1px 2px rgba(0,0,0,0.5))";
-
+    const add = (points: NorthWindPoint[] | undefined, fill: string, phase: string) => {
+      for (const p of points ?? []) {
+        const el = document.createElement("div");
+        el.innerHTML = triangleSvg(fill, 18);
+        el.style.transform = "translateY(2px)";
         markers.push(
           new markerLib.AdvancedMarkerElement({
             map,
-            position: { lat: pos[0], lng: pos[1] },
-            title: "North Wind Landing (Parachute)",
-            content: triangleElement,
+            position: { lat: p.lat, lng: p.lon },
+            title: `Wind from magnetic N, ${p.wind_speed.toFixed(1)} m/s (${phase})`,
+            content: el,
+            zIndex: 500,
           }),
         );
-      });
-    }
-
-    if (showTrajectory && pointsTraj && pointsTraj.length > 0) {
-      pointsTraj.forEach((pos) => {
-        const triangleElement = document.createElement("div");
-        triangleElement.style.width = "0";
-        triangleElement.style.height = "0";
-        triangleElement.style.borderLeft = "6px solid transparent";
-        triangleElement.style.borderRight = "6px solid transparent";
-        triangleElement.style.borderTop = "10px solid #22d3ee"; // Cool color for trajectory
-        triangleElement.style.filter = "drop-shadow(0px 1px 2px rgba(0,0,0,0.5))";
-
-        markers.push(
-          new markerLib.AdvancedMarkerElement({
-            map,
-            position: { lat: pos[0], lng: pos[1] },
-            title: "North Wind Landing (Trajectory)",
-            content: triangleElement,
-          }),
-        );
-      });
-    }
+      }
+    };
+    if (showParachute) add(pointsPara, COLORS.northWindPara, "parachute");
+    if (showTrajectory) add(pointsTraj, COLORS.northWindTraj, "trajectory");
 
     return () => {
       markers.forEach((m) => (m.map = null));
     };
   }, [map, markerLib, pointsPara, pointsTraj, showParachute, showTrajectory]);
+  return null;
+}
+
+function LandingDots({
+  points,
+  showParachute,
+  showTrajectory,
+}: {
+  points: LandingPoint[];
+  showParachute: boolean;
+  showTrajectory: boolean;
+}) {
+  const map = useMap();
+  useEffect(() => {
+    if (!map || !window.google) return;
+    const markers = points
+      .filter((p) => (p.isParachute ? showParachute : showTrajectory))
+      .map(
+        (p) =>
+          new window.google.maps.Marker({
+            map,
+            position: { lat: p.pos[0], lng: p.pos[1] },
+            title: `${p.isParachute ? "Parachute" : "Trajectory"} landing — wind ${p.speed.toFixed(1)} m/s`,
+            icon: {
+              path: window.google.maps.SymbolPath.CIRCLE,
+              scale: 3.5,
+              fillColor: p.color,
+              fillOpacity: 1,
+              strokeColor: "#ffffff",
+              strokeWeight: 1,
+            },
+          }),
+      );
+    return () => markers.forEach((m) => m.setMap(null));
+  }, [map, points, showParachute, showTrajectory]);
+  return null;
+}
+
+function MagneticNorthLine({ line, magDec }: { line: [LatLng, LatLng]; magDec: number }) {
+  const map = useMap();
+  const markerLib = useMapsLibrary("marker");
+  useEffect(() => {
+    if (!map || !window.google || !markerLib) return;
+    const path = line.map(([lat, lng]) => ({ lat, lng }));
+    const polyline = new window.google.maps.Polyline({
+      map,
+      path,
+      strokeOpacity: 0,
+      icons: [
+        {
+          icon: { path: "M 0,-1 0,1", strokeOpacity: 1, strokeColor: COLORS.magneticNorth, strokeWeight: 3, scale: 3 },
+          offset: "0",
+          repeat: "16px",
+        },
+      ],
+    });
+    const label = document.createElement("div");
+    label.textContent = "MN";
+    label.title = `Magnetic north (${formatDeclination(magDec)})`;
+    Object.assign(label.style, {
+      font: "700 13px system-ui, sans-serif",
+      color: "#111827",
+      background: COLORS.magneticNorth,
+      padding: "2px 6px",
+      borderRadius: "4px",
+      boxShadow: "0 1px 3px rgba(0,0,0,.4)",
+    });
+    const marker = new markerLib.AdvancedMarkerElement({ map, position: path[1], content: label });
+    return () => {
+      polyline.setMap(null);
+      marker.map = null;
+    };
+  }, [map, markerLib, line, magDec]);
   return null;
 }
 
@@ -341,18 +396,24 @@ function InnerMap({
   ignitionRadius,
   northWindPoints,
   northWindPointsTraj,
+  landingPoints,
+  mnLine,
+  magDec,
   showTrajectory,
   showParachute,
   showSafetyArea,
 }: {
   geoJsonFeatures: FeatureCollection[];
+  landingPoints: LandingPoint[];
+  mnLine: [LatLng, LatLng] | null;
+  magDec?: number | null;
   launchPos?: [number, number] | null;
   launchRadius?: number;
   safetyArea?: [number, number][];
   ignitionPos?: [number, number] | null;
   ignitionRadius?: number;
-  northWindPoints?: [number, number][];
-  northWindPointsTraj?: [number, number][];
+  northWindPoints?: NorthWindPoint[];
+  northWindPointsTraj?: NorthWindPoint[];
   showTrajectory: boolean;
   showParachute: boolean;
   showSafetyArea: boolean;
@@ -379,6 +440,8 @@ function InnerMap({
       {launchPos && launchRadius && launchRadius > 0 && <LaunchCircle center={launchPos} radius={launchRadius} />}
       {ignitionPos && <IgnitionMarker pos={ignitionPos} />}
       {ignitionPos && ignitionRadius && ignitionRadius > 0 && <IgnitionCircle center={ignitionPos} radius={ignitionRadius} />}
+      <LandingDots points={landingPoints} showParachute={showParachute} showTrajectory={showTrajectory} />
+      {mnLine && magDec != null && <MagneticNorthLine line={mnLine} magDec={magDec} />}
       <NorthWindMarkers 
         pointsPara={northWindPoints} 
         pointsTraj={northWindPointsTraj} 
@@ -398,6 +461,8 @@ export default function MapViewerGoogle({
   ignitionRadius,
   northWindPoints,
   northWindPointsTraj,
+  magDec,
+  totalImpulse,
   apiKey,
 }: MapViewerProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -407,67 +472,13 @@ export default function MapViewerGoogle({
   const [showParachute, setShowParachute] = useState(true);
   const [showSafetyArea, setShowSafetyArea] = useState(true);
 
-  const { allFeatures, legendData } = useMemo(() => {
-    const all: FeatureCollection[] = [];
-    const legendMap = new globalThis.Map<number, LegendItem>();
+  const dispersion = useMemo(() => parseDispersionKml(kmlData), [kmlData]);
+  const { all: allFeatures, legend: legendData, landingPoints } = dispersion;
 
-    if (typeof window === "undefined") {
-      return { allFeatures: all, legendData: [] };
-    }
-
-    const parser = new DOMParser();
-
-    for (const [filename, kmlString] of Object.entries(kmlData)) {
-      if (!kmlString) continue;
-
-      try {
-        const doc = parser.parseFromString(kmlString, "text/xml");
-        const converted = kml(doc) as FeatureCollection;
-        const isParachute = String(filename).toLowerCase().includes("parachute");
-
-        converted.features.forEach((f) => {
-          if (!f.properties) f.properties = {};
-          f.properties.sourceFile = filename;
-
-          const rawColor = f.properties.stroke;
-          const color =
-            typeof rawColor === "string"
-              ? rawColor
-              : isParachute
-                ? "#ff4500"
-                : "#00bfff";
-          const name = f.properties.name || "";
-          const match = name.match(/Wind\s+([\d\.]+)\s+m\/s/i);
-
-          if (match) {
-            const speedNum = parseFloat(match[1]);
-            const speedStr = `${match[1]} m/s`;
-            if (!legendMap.has(speedNum)) {
-              legendMap.set(speedNum, {
-                speedNum,
-                speedStr,
-                trajColor: "#cccccc",
-                paraColor: "#cccccc",
-              });
-            }
-            const entry = legendMap.get(speedNum)!;
-            if (isParachute) entry.paraColor = color;
-            else entry.trajColor = color;
-          }
-        });
-
-        converted.features.reverse();
-        all.push(converted);
-      } catch (err) {
-        console.error(`Failed to parse KML`, err);
-      }
-    }
-
-    const sortedLegendData = Array.from(legendMap.values()).sort(
-      (a, b) => a.speedNum - b.speedNum,
-    );
-    return { allFeatures: all, legendData: sortedLegendData };
-  }, [kmlData]);
+  const mnLine = useMemo(() => {
+    if (!launchPos || magDec == null || legendData.length === 0) return null;
+    return magneticNorthLine(launchPos, magDec, landingPoints.map((p) => p.pos));
+  }, [launchPos, magDec, landingPoints, legendData.length]);
 
   if (!apiKey) {
     return (
@@ -518,41 +529,29 @@ export default function MapViewerGoogle({
           </div>
         </div>
 
-        {/* Bottom Left: Dynamic Legend */}
-        {legendData.length > 0 && (
-          <div className="flex justify-start pb-6 pl-4">
-            <div className="pointer-events-auto bg-white/95 p-4 rounded-lg shadow-[0_2px_10px_rgba(0,0,0,0.2)] text-slate-800 font-sans border border-slate-200/60">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-3.5 h-3.5 rounded-full bg-red-600 shadow-sm border border-red-700"></div>
-                <span className="font-bold text-[15px] tracking-tight">Launch point</span>
-              </div>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-3.5 h-3.5 rounded-full bg-blue-500 shadow-sm border border-blue-600"></div>
-                <span className="font-bold text-[15px] tracking-tight">Ignition point</span>
-              </div>
-              <div className="grid grid-cols-[auto_auto_1fr] gap-x-4 gap-y-1.5 items-center">
-                <div className="text-[10px] font-bold text-center text-slate-400 uppercase tracking-widest pb-1 border-b border-slate-200">Traj.</div>
-                <div className="text-[10px] font-bold text-center text-slate-400 uppercase tracking-widest pb-1 border-b border-slate-200">Para.</div>
-                <div className="text-[10px] font-bold text-left text-slate-400 uppercase tracking-widest pb-1 border-b border-slate-200">Wind</div>
-                {legendData.map((item) => (
-                  <Fragment key={item.speedStr}>
-                    <div className="flex items-center w-8" title="Trajectory">
-                      <div className="h-[2px] flex-1" style={{ backgroundColor: item.trajColor }}></div>
-                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.trajColor }}></div>
-                      <div className="h-[2px] flex-1" style={{ backgroundColor: item.trajColor }}></div>
-                    </div>
-                    <div className="flex items-center w-8" title="Parachute">
-                      <div className="h-[2px] flex-1" style={{ backgroundColor: item.paraColor }}></div>
-                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.paraColor }}></div>
-                      <div className="h-[2px] flex-1" style={{ backgroundColor: item.paraColor }}></div>
-                    </div>
-                    <div className="text-[14px] font-medium ml-1 tabular-nums">{item.speedStr}</div>
-                  </Fragment>
-                ))}
-              </div>
+        {/* Bottom: Legend (left) and north indicator (right) */}
+        <div className="flex justify-between items-end pb-6 px-4">
+          {legendData.length > 0 ? (
+            <div className="pointer-events-auto">
+              <DispersionLegend
+                legend={legendData}
+                speedStep={dispersion.speedStep}
+                directionCount={dispersion.directionCount}
+                magDec={magDec}
+                hasNorthTraj={(northWindPointsTraj?.length ?? 0) > 0}
+                hasNorthPara={(northWindPoints?.length ?? 0) > 0}
+                totalImpulse={totalImpulse}
+              />
             </div>
-          </div>
-        )}
+          ) : (
+            <div />
+          )}
+          {magDec != null && (
+            <div className="mb-8 mr-12">
+              <NorthIndicator magDec={magDec} />
+            </div>
+          )}
+        </div>
       </div>
 
       <APIProvider apiKey={apiKey}>
@@ -565,6 +564,9 @@ export default function MapViewerGoogle({
           ignitionRadius={ignitionRadius}
           northWindPoints={northWindPoints}
           northWindPointsTraj={northWindPointsTraj}
+          landingPoints={landingPoints}
+          mnLine={mnLine}
+          magDec={magDec}
           showTrajectory={showTrajectory}
           showParachute={showParachute}
           showSafetyArea={showSafetyArea}

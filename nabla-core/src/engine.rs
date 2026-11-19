@@ -23,6 +23,8 @@ pub struct Engine {
     pub delta_fuel: f64,
     pub l_tank: f64,
     pub time_act: f64,
+    /// Total impulse of the thrust curve [N·s]
+    pub total_impulse: f64,
     time_array: Vec<f64>,
     thrust_array: Vec<f64>,
     mdot_prop_log: Vec<f64>,
@@ -77,6 +79,7 @@ impl Engine {
             delta_fuel,
             l_tank,
             time_act,
+            total_impulse,
             time_array,
             thrust_array,
             mdot_prop_log,

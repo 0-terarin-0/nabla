@@ -10,6 +10,7 @@ import {
   API_BASE,
   type ExtraFile,
 } from "@/lib/backend";
+import type { NorthWindPoint } from "@/lib/dispersion";
 import { useTheme } from "next-themes";
 import {
   Play,
@@ -56,8 +57,10 @@ interface SimulationResult {
   ignition_pos?: [number, number];
   launch_radius: number;
   ignition_radius: number;
-  north_wind_points: [number, number][];
-  north_wind_points_traj: [number, number][];
+  north_wind_points: NorthWindPoint[];
+  north_wind_points_traj: NorthWindPoint[];
+  mag_dec?: number;
+  total_impulse?: number;
 }
 
 type LogLevel = "info" | "success" | "error";
@@ -98,8 +101,10 @@ export default function Home() {
   const [launchRadius, setLaunchRadius] = useState<number>(0.0);
   const [safetyArea, setSafetyArea] = useState<[number, number][]>([]);
   const [ignitionRadius, setIgnitionRadius] = useState<number>(10.0);
-  const [northWindPoints, setNorthWindPoints] = useState<[number, number][]>([]);
-  const [northWindPointsTraj, setNorthWindPointsTraj] = useState<[number, number][]>([]);
+  const [northWindPoints, setNorthWindPoints] = useState<NorthWindPoint[]>([]);
+  const [northWindPointsTraj, setNorthWindPointsTraj] = useState<NorthWindPoint[]>([]);
+  const [magDec, setMagDec] = useState<number | null>(null);
+  const [totalImpulse, setTotalImpulse] = useState<number | null>(null);
   const [ignitionPos, setIgnitionPos] = useState<[number, number] | null>(null);
   const [lastResult, setLastResult] = useState<LastResult | null>(null);
 
@@ -228,6 +233,16 @@ export default function Home() {
       const elapsed = ((performance.now() - started) / 1000).toFixed(2);
       log(`${label} simulation finished in ${elapsed}s.`, "success");
 
+      if (result.total_impulse != null) {
+        log(`Thrust curve total impulse: ${result.total_impulse.toFixed(1)} N·s`);
+      }
+      if (isLoop && (result.north_wind_points_traj?.length ?? 0) === 0) {
+        log(
+          "No magnetic-north wind case in the sweep (azimuth 0° not included). Set [Solver] azimuth_min so that 0° is covered.",
+          "error",
+        );
+      }
+
       if (result.kml_files && Object.keys(result.kml_files).length > 0) {
         setKmlData(result.kml_files);
         setLaunchPos(result.launch_pos);
@@ -237,6 +252,8 @@ export default function Home() {
         setNorthWindPoints(result.north_wind_points || []);
         setNorthWindPointsTraj(result.north_wind_points_traj || []);
         setIgnitionPos(result.ignition_pos || null);
+        setMagDec(result.mag_dec ?? null);
+        setTotalImpulse(result.total_impulse ?? null);
         setActiveTab("map");
       }
 
@@ -353,9 +370,9 @@ export default function Home() {
             <TabsContent value="map" className="flex-1 min-h-0 rounded-lg border border-border bg-card overflow-hidden relative">
               {hasMap ? (
                 useGoogleMaps && googleApiKey ? (
-                  <MapViewerGoogle kmlData={kmlData} launchPos={launchPos} safetyArea={safetyArea} ignitionRadius={ignitionRadius} northWindPoints={northWindPoints} northWindPointsTraj={northWindPointsTraj} launchRadius={launchRadius} ignitionPos={ignitionPos} apiKey={googleApiKey} />
+                  <MapViewerGoogle kmlData={kmlData} launchPos={launchPos} safetyArea={safetyArea} ignitionRadius={ignitionRadius} northWindPoints={northWindPoints} northWindPointsTraj={northWindPointsTraj} launchRadius={launchRadius} ignitionPos={ignitionPos} magDec={magDec} totalImpulse={totalImpulse} apiKey={googleApiKey} />
                 ) : (
-                  <MapViewer kmlData={kmlData} launchPos={launchPos} safetyArea={safetyArea} ignitionRadius={ignitionRadius} northWindPoints={northWindPoints} northWindPointsTraj={northWindPointsTraj} launchRadius={launchRadius} ignitionPos={ignitionPos} />
+                  <MapViewer kmlData={kmlData} launchPos={launchPos} safetyArea={safetyArea} ignitionRadius={ignitionRadius} northWindPoints={northWindPoints} northWindPointsTraj={northWindPointsTraj} launchRadius={launchRadius} ignitionPos={ignitionPos} magDec={magDec} totalImpulse={totalImpulse} />
                 )
               ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center gap-3 text-muted-foreground bg-muted/10">

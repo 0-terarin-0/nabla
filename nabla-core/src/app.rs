@@ -16,7 +16,7 @@ use serde::Serialize;
 use zip::write::SimpleFileOptions;
 
 use crate::parameter::Parameter;
-use crate::post_process::{export_csv, export_kml, export_loop_kml, ned2llh};
+use crate::post_process::{export_csv, export_kml, export_loop_kml, magnetic_north_index, ned2llh};
 use crate::solver::{solve_parachute, solve_trajectory};
 
 /// Default configuration shown in the GUI on startup.
@@ -29,6 +29,14 @@ pub struct ExtraFile {
     pub content: Vec<u8>,
 }
 
+/// Landing point for wind blowing from magnetic north.
+#[derive(Debug, Clone, Serialize)]
+pub struct NorthWindPoint {
+    pub lat: f64,
+    pub lon: f64,
+    pub wind_speed: f64,
+}
+
 #[derive(Debug, Serialize)]
 pub struct SimulationResult {
     pub zip_bytes: Vec<u8>,
@@ -38,8 +46,14 @@ pub struct SimulationResult {
     pub safety_area: Vec<Vec<f64>>,
     pub ignition_pos: Option<(f64, f64)>,
     pub ignition_radius: f64,
-    pub north_wind_points: Vec<(f64, f64)>,
-    pub north_wind_points_traj: Vec<(f64, f64)>,
+    /// Parachute landing points for magnetic-north wind (one per wind speed).
+    pub north_wind_points: Vec<NorthWindPoint>,
+    /// Ballistic landing points for magnetic-north wind (one per wind speed).
+    pub north_wind_points_traj: Vec<NorthWindPoint>,
+    /// Magnetic declination [deg], east positive (Japan: negative = west).
+    pub mag_dec: f64,
+    /// Total impulse of the thrust curve used [N·s].
+    pub total_impulse: f64,
 }
 
 /// Run a simulation.
@@ -94,6 +108,8 @@ pub fn run_simulation(
         ignition_radius: markers.ignition_radius,
         north_wind_points,
         north_wind_points_traj,
+        mag_dec: param.launch.mag_dec,
+        total_impulse: param.engine.total_impulse,
     })
 }
 
@@ -151,11 +167,18 @@ fn pos(state: &DVector<f64>) -> Vector3<f64> {
     Vector3::new(state[0], state[1], state[2])
 }
 
-type LatLon = (f64, f64);
+fn north_point(param: &Parameter, ned: &Vector3<f64>, wind_speed: f64) -> NorthWindPoint {
+    let lla = ned2llh(&param.launch.llh, ned);
+    NorthWindPoint {
+        lat: lla[0],
+        lon: lla[1],
+        wind_speed,
+    }
+}
 
 /// Dispersion (wind speed × azimuth) analysis. Returns north-wind landing points
 /// (parachute, ballistic).
-fn run_loop(param: &Parameter, dir: &Path) -> Result<(Vec<LatLon>, Vec<LatLon>)> {
+fn run_loop(param: &Parameter, dir: &Path) -> Result<(Vec<NorthWindPoint>, Vec<NorthWindPoint>)> {
     let (speeds, azimuths) = param.get_wind_array();
     let jobs: Vec<_> = (0..speeds.len())
         .flat_map(|i| (0..azimuths.len()).map(move |j| (i, j)))
@@ -183,15 +206,15 @@ fn run_loop(param: &Parameter, dir: &Path) -> Result<(Vec<LatLon>, Vec<LatLon>)>
     let mut north_points = Vec::new();
     let mut north_points_traj = Vec::new();
 
+    let north_idx = magnetic_north_index(&azimuths);
     for (i, j, hard, soft) in results {
         pos_hard_matrix[i][j] = hard;
         pos_soft_matrix[i][j] = soft;
-        if (azimuths[j] % 360.0).abs() < 1e-6 {
-            let lla_hard = ned2llh(&param.launch.llh, &hard);
-            north_points_traj.push((lla_hard[0], lla_hard[1]));
+        // Wind azimuth is measured from magnetic north (declination is applied in Wind).
+        if Some(j) == north_idx {
+            north_points_traj.push(north_point(param, &hard, speeds[i]));
             if param.para.vel_para_1st > 0.0 {
-                let lla_soft = ned2llh(&param.launch.llh, &soft);
-                north_points.push((lla_soft[0], lla_soft[1]));
+                north_points.push(north_point(param, &soft, speeds[i]));
             }
         }
     }
@@ -201,6 +224,8 @@ fn run_loop(param: &Parameter, dir: &Path) -> Result<(Vec<LatLon>, Vec<LatLon>)>
         &param.launch.llh,
         &pos_hard_matrix,
         &speeds,
+        &azimuths,
+        param.launch.mag_dec,
         "ff00aaff",
     )?;
     export_loop_kml(
@@ -208,6 +233,8 @@ fn run_loop(param: &Parameter, dir: &Path) -> Result<(Vec<LatLon>, Vec<LatLon>)>
         &param.launch.llh,
         &pos_soft_matrix,
         &speeds,
+        &azimuths,
+        param.launch.mag_dec,
         "ffffff00",
     )?;
 

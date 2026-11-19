@@ -96,6 +96,8 @@ fn main() -> Result<()> {
             &param.launch.llh,
             &pos_hard_matrix,
             &speeds,
+            &azimuths,
+            param.launch.mag_dec,
             "ff00aaff",
         )?;
         export_loop_kml(
@@ -103,6 +105,8 @@ fn main() -> Result<()> {
             &param.launch.llh,
             &pos_soft_matrix,
             &speeds,
+            &azimuths,
+            param.launch.mag_dec,
             "ffffff00",
         )?;
 
