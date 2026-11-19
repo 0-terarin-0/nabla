@@ -143,11 +143,29 @@ fn write_kml_linestring(
     Ok(())
 }
 
+/// Index of the wind azimuth that blows from magnetic north (0°), if swept.
+/// Wind azimuths are measured from magnetic north.
+pub fn magnetic_north_index(azimuths: &[f64]) -> Option<usize> {
+    azimuths.iter().position(|a| {
+        let r = a.rem_euclid(360.0);
+        r < 1e-6 || 360.0 - r < 1e-6
+    })
+}
+
+/// Export the landing dispersion map.
+///
+/// Besides one polygon per wind speed, this adds annotations required for
+/// dispersion maps: a magnetic-north line from the launch point and markers for
+/// the landing points under magnetic-north wind (labeled with the wind speed).
+/// Annotation placemarks carry `<Data name="annotation">` so viewers can tell them apart.
+#[allow(clippy::too_many_arguments)]
 pub fn export_loop_kml(
     path: &str,
     llh: &nalgebra::Vector3<f64>,
     pos_matrix: &[Vec<nalgebra::Vector3<f64>>],
     speeds: &[f64],
+    azimuths: &[f64],
+    mag_dec: f64,
     color: &str,
 ) -> anyhow::Result<()> {
     use std::io::Write;
@@ -225,8 +243,75 @@ pub fn export_loop_kml(
         writeln!(file, "    </Placemark>").unwrap();
     }
 
+    write_loop_annotations(&mut file, llh, pos_matrix, speeds, azimuths, mag_dec, name_prefix)?;
+
     writeln!(file, "  </Document>").unwrap();
     writeln!(file, "</kml>").unwrap();
+    Ok(())
+}
+
+fn write_loop_annotations(
+    file: &mut impl Write,
+    llh: &Vector3<f64>,
+    pos_matrix: &[Vec<Vector3<f64>>],
+    speeds: &[f64],
+    azimuths: &[f64],
+    mag_dec: f64,
+    name_prefix: &str,
+) -> Result<()> {
+    let annotation = "<ExtendedData><Data name=\"annotation\"><value>true</value></Data></ExtendedData>";
+
+    // Magnetic-north line: long enough to reach past the farthest landing point.
+    let farthest = pos_matrix
+        .iter()
+        .flatten()
+        .map(|p| (p[0].powi(2) + p[1].powi(2)).sqrt())
+        .fold(0.0_f64, f64::max);
+    let length = (farthest * 1.15).max(200.0);
+    let dec = mag_dec.to_radians();
+    let tip = ned2llh(llh, &Vector3::new(length * dec.cos(), length * dec.sin(), 0.0));
+    let dec_label = format!("{:.1}° {}", mag_dec.abs(), if mag_dec < 0.0 { "W" } else { "E" });
+
+    writeln!(file, "    <Placemark>")?;
+    writeln!(file, "      <name>Magnetic North</name>")?;
+    writeln!(file, "      <description>Magnetic north from the launch point (declination {dec_label})</description>")?;
+    writeln!(file, "      {annotation}")?;
+    writeln!(file, "      <Style><LineStyle><color>ff15ccfa</color><width>3</width></LineStyle></Style>")?;
+    writeln!(file, "      <LineString><tessellate>1</tessellate><coordinates>")?;
+    writeln!(file, "        {},{},0 {},{},0", llh[1], llh[0], tip[1], tip[0])?;
+    writeln!(file, "      </coordinates></LineString>")?;
+    writeln!(file, "    </Placemark>")?;
+
+    writeln!(file, "    <Placemark>")?;
+    writeln!(file, "      <name>MN ({dec_label})</name>")?;
+    writeln!(file, "      {annotation}")?;
+    writeln!(file, "      <Style><IconStyle><scale>0</scale></IconStyle><LabelStyle><color>ff15ccfa</color><scale>1.1</scale></LabelStyle></Style>")?;
+    writeln!(file, "      <Point><coordinates>{},{},0</coordinates></Point>", tip[1], tip[0])?;
+    writeln!(file, "    </Placemark>")?;
+
+    // Landing points under magnetic-north wind, one per wind speed.
+    let Some(j) = magnetic_north_index(azimuths) else {
+        return Ok(());
+    };
+    writeln!(file, "    <Folder>")?;
+    writeln!(file, "      <name>{name_prefix} - Wind from Magnetic North</name>")?;
+    for (i, speed) in speeds.iter().enumerate() {
+        let Some(pt) = pos_matrix.get(i).and_then(|row| row.get(j)) else {
+            continue;
+        };
+        let lla = ned2llh(llh, pt);
+        writeln!(file, "      <Placemark>")?;
+        writeln!(file, "        <name>{speed:.1} m/s</name>")?;
+        writeln!(
+            file,
+            "        <description>{name_prefix} landing, wind {speed:.1} m/s from magnetic north</description>"
+        )?;
+        writeln!(file, "        {annotation}")?;
+        writeln!(file, "        <Style><IconStyle><scale>0.8</scale><Icon><href>http://maps.google.com/mapfiles/kml/shapes/triangle.png</href></Icon></IconStyle><LabelStyle><scale>0.8</scale></LabelStyle></Style>")?;
+        writeln!(file, "        <Point><coordinates>{},{},{}</coordinates></Point>", lla[1], lla[0], lla[2])?;
+        writeln!(file, "      </Placemark>")?;
+    }
+    writeln!(file, "    </Folder>")?;
     Ok(())
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, Fragment } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -12,21 +12,32 @@ import {
   Tooltip,
   Polygon,
   Circle,
+  CircleMarker,
+  Polyline,
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import { kml } from "@tmcw/togeojson";
 import L from "leaflet";
 import type { FeatureCollection } from "geojson";
 import { toBlob } from "html-to-image";
 import { Camera, Loader2 } from "lucide-react";
 import { saveFile } from "@/lib/backend";
+import {
+  COLORS,
+  formatDeclination,
+  magneticNorthLine,
+  parseDispersionKml,
+  triangleSvg,
+  type LatLng,
+  type NorthWindPoint,
+} from "@/lib/dispersion";
+import { DispersionLegend, NorthIndicator } from "@/components/DispersionLegend";
 
 // Fix Leaflet's default icon path issues in React/Webpack environments
 let blueDotIcon: L.DivIcon | undefined;
 let redDotIcon: L.DivIcon | undefined;
-let blueTriangleIcon: L.DivIcon | undefined;
-
-let blackTriangleIcon: L.DivIcon | undefined;
+let northTrajIcon: L.DivIcon | undefined;
+let northParaIcon: L.DivIcon | undefined;
+let mnLabelIcon: L.DivIcon | undefined;
 
 if (typeof window !== "undefined") {
   delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -50,18 +61,21 @@ if (typeof window !== "undefined") {
     iconAnchor: [6, 6],
   });
 
-  blueTriangleIcon = L.divIcon({
-    className: "bg-transparent",
-    html: `<div style="width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 10px solid #22d3ee; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));"></div>`,
-    iconSize: [12, 10],
-    iconAnchor: [6, 10],
-  });
+  const triangleIcon = (fill: string) =>
+    L.divIcon({
+      className: "bg-transparent",
+      html: triangleSvg(fill, 18),
+      iconSize: [18, 18],
+      iconAnchor: [9, 16],
+    });
+  northTrajIcon = triangleIcon(COLORS.northWindTraj);
+  northParaIcon = triangleIcon(COLORS.northWindPara);
 
-  blackTriangleIcon = L.divIcon({
+  mnLabelIcon = L.divIcon({
     className: "bg-transparent",
-    html: `<div style="width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 10px solid #000000; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));"></div>`,
-    iconSize: [12, 10],
-    iconAnchor: [6, 10],
+    html: `<div style="transform:translate(-50%,-100%);white-space:nowrap;font:700 13px system-ui,sans-serif;color:#111827;background:${COLORS.magneticNorth};padding:2px 6px;border-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,.4)">MN</div>`,
+    iconSize: [0, 0],
+    iconAnchor: [0, 4],
   });
 }
 
@@ -89,13 +103,6 @@ function MapBounds({ geoJsonData }: { geoJsonData: FeatureCollection[] }) {
   return null;
 }
 
-type LegendItem = {
-  speedNum: number;
-  speedStr: string;
-  trajColor: string;
-  paraColor: string;
-};
-
 export interface MapViewerProps {
   kmlData: Record<string, string>;
   launchPos?: [number, number] | null;
@@ -103,8 +110,12 @@ export interface MapViewerProps {
   safetyArea?: [number, number][];
   ignitionPos?: [number, number] | null;
   ignitionRadius?: number;
-  northWindPoints?: [number, number][];
-  northWindPointsTraj?: [number, number][];
+  northWindPoints?: NorthWindPoint[];
+  northWindPointsTraj?: NorthWindPoint[];
+  /** Magnetic declination [deg], negative = west. */
+  magDec?: number | null;
+  /** Total impulse of the thrust curve [N·s]. */
+  totalImpulse?: number | null;
 }
 
 export default function MapViewer({
@@ -116,90 +127,26 @@ export default function MapViewer({
   ignitionRadius,
   northWindPoints,
   northWindPointsTraj,
+  magDec,
+  totalImpulse,
 }: MapViewerProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
 
-  const { trajectoryFeatures, parachuteFeatures, allFeatures, legendData } =
-    useMemo(() => {
-      const trajectory: FeatureCollection[] = [];
-      const parachute: FeatureCollection[] = [];
-      const all: FeatureCollection[] = [];
-      const legendMap = new Map<number, LegendItem>();
+  const dispersion = useMemo(() => parseDispersionKml(kmlData), [kmlData]);
+  const {
+    trajectory: trajectoryFeatures,
+    parachute: parachuteFeatures,
+    all: allFeatures,
+    legend: legendData,
+    landingPoints,
+  } = dispersion;
 
-      if (typeof window === "undefined") {
-        return {
-          trajectoryFeatures: trajectory,
-          parachuteFeatures: parachute,
-          allFeatures: all,
-          legendData: [],
-        };
-      }
+  const mnLine = useMemo(() => {
+    if (!launchPos || magDec == null || legendData.length === 0) return null;
+    return magneticNorthLine(launchPos, magDec, landingPoints.map((p) => p.pos));
+  }, [launchPos, magDec, landingPoints, legendData.length]);
 
-      const parser = new DOMParser();
-
-      for (const [filename, kmlString] of Object.entries(kmlData)) {
-        if (!kmlString) continue;
-
-        try {
-          const doc = parser.parseFromString(kmlString, "text/xml");
-          const converted = kml(doc) as FeatureCollection;
-          const isParachute = filename.toLowerCase().includes("parachute");
-
-          converted.features.forEach((f) => {
-            if (!f.properties) f.properties = {};
-            f.properties.sourceFile = filename;
-
-            const color =
-              f.properties.stroke || (isParachute ? "#ff4500" : "#00bfff");
-            const name = f.properties.name || "";
-
-            const match = name.match(/Wind\s+([\d\.]+)\s+m\/s/i);
-            if (match) {
-              const speedNum = parseFloat(match[1]);
-              const speedStr = `${match[1]} m/s`;
-
-              if (!legendMap.has(speedNum)) {
-                legendMap.set(speedNum, {
-                  speedNum,
-                  speedStr,
-                  trajColor: "#cccccc", 
-                  paraColor: "#cccccc",
-                });
-              }
-
-              const entry = legendMap.get(speedNum)!;
-              if (isParachute) {
-                entry.paraColor = color;
-              } else {
-                entry.trajColor = color;
-              }
-            }
-          });
-
-          converted.features.reverse();
-          all.push(converted);
-
-          if (isParachute) {
-            parachute.push(converted);
-          } else {
-            trajectory.push(converted);
-          }
-        } catch (err) {
-          console.error(`Failed to parse KML for ${filename}`, err);
-        }
-      }
-
-      const sortedLegendData = Array.from(legendMap.values()).sort(
-        (a, b) => a.speedNum - b.speedNum,
-      );
-
-      return {
-        trajectoryFeatures: trajectory,
-        parachuteFeatures: parachute,
-        allFeatures: all,
-        legendData: sortedLegendData,
-      };
-    }, [kmlData]);
+  const toLatLng = (p: NorthWindPoint): LatLng => [p.lat, p.lon];
 
   const defaultCenter: [number, number] = [34.2852, 135.09059];
 
@@ -246,7 +193,7 @@ export default function MapViewer({
     setIsCapturing(true);
     try {
       const blob = await toBlob(node, {
-        pixelRatio: Math.max(window.devicePixelRatio || 1, 2),
+        pixelRatio: Math.max(window.devicePixelRatio || 1, 3),
         backgroundColor: "#0f172a",
         // Return true to KEEP a node. Exclude UI controls from the image.
         filter: (n) =>
@@ -287,51 +234,22 @@ export default function MapViewer({
       </div>
 
       {legendData.length > 0 && (
-        <div className="absolute bottom-6 left-6 z-[1000] bg-white/95 p-4 rounded-lg shadow-[0_2px_10px_rgba(0,0,0,0.2)] text-slate-800 font-sans pointer-events-auto border border-slate-200/60">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-3.5 h-3.5 rounded-full bg-red-600 shadow-sm border border-red-700"></div>
-            <span className="font-bold text-[15px] tracking-tight">
-              Launch point
-            </span>
-          </div>
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-3.5 h-3.5 rounded-full bg-blue-500 shadow-sm border border-blue-600"></div>
-            <span className="font-bold text-[15px] tracking-tight">
-              Ignition point
-            </span>
-          </div>
+        <div className="absolute bottom-6 left-6 z-[1000] pointer-events-auto">
+          <DispersionLegend
+            legend={legendData}
+            speedStep={dispersion.speedStep}
+            directionCount={dispersion.directionCount}
+            magDec={magDec}
+            hasNorthTraj={(northWindPointsTraj?.length ?? 0) > 0}
+            hasNorthPara={(northWindPoints?.length ?? 0) > 0}
+            totalImpulse={totalImpulse}
+          />
+        </div>
+      )}
 
-          <div className="grid grid-cols-[auto_auto_1fr] gap-x-4 gap-y-1.5 items-center">
-            <div className="text-[10px] font-bold text-center text-slate-400 uppercase tracking-widest pb-1 border-b border-slate-200">
-              Traj.
-            </div>
-            <div className="text-[10px] font-bold text-center text-slate-400 uppercase tracking-widest pb-1 border-b border-slate-200">
-              Para.
-            </div>
-            <div className="text-[10px] font-bold text-left text-slate-400 uppercase tracking-widest pb-1 border-b border-slate-200">
-              Wind
-            </div>
-
-            {legendData.map((item) => (
-              <Fragment key={item.speedStr}>
-                <div className="flex items-center w-8" title="Trajectory">
-                  <div className="h-[2px] flex-1" style={{ backgroundColor: item.trajColor }}></div>
-                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.trajColor }}></div>
-                  <div className="h-[2px] flex-1" style={{ backgroundColor: item.trajColor }}></div>
-                </div>
-
-                <div className="flex items-center w-8" title="Parachute">
-                  <div className="h-[2px] flex-1" style={{ backgroundColor: item.paraColor }}></div>
-                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.paraColor }}></div>
-                  <div className="h-[2px] flex-1" style={{ backgroundColor: item.paraColor }}></div>
-                </div>
-
-                <div className="text-[14px] font-medium ml-1 tabular-nums">
-                  {item.speedStr}
-                </div>
-              </Fragment>
-            ))}
-          </div>
+      {magDec != null && (
+        <div className="absolute bottom-6 right-6 z-[1000] pointer-events-none">
+          <NorthIndicator magDec={magDec} />
         </div>
       )}
 
@@ -379,6 +297,18 @@ export default function MapViewer({
                     style={getStyle}
                   />
                 ))}
+                {landingPoints
+                  .filter((p) => !p.isParachute)
+                  .map((p, idx) => (
+                    <CircleMarker
+                      key={`traj-pt-${idx}`}
+                      center={p.pos}
+                      radius={3}
+                      pathOptions={{ color: "#ffffff", weight: 1, fillColor: p.color, fillOpacity: 1 }}
+                    >
+                      <Tooltip>Trajectory landing — wind {p.speed.toFixed(1)} m/s</Tooltip>
+                    </CircleMarker>
+                  ))}
               </FeatureGroup>
             </LayersControl.Overlay>
           )}
@@ -394,31 +324,59 @@ export default function MapViewer({
                     style={getStyle}
                   />
                 ))}
+                {landingPoints
+                  .filter((p) => p.isParachute)
+                  .map((p, idx) => (
+                    <CircleMarker
+                      key={`para-pt-${idx}`}
+                      center={p.pos}
+                      radius={3}
+                      pathOptions={{ color: "#ffffff", weight: 1, fillColor: p.color, fillOpacity: 1 }}
+                    >
+                      <Tooltip>Parachute landing — wind {p.speed.toFixed(1)} m/s</Tooltip>
+                    </CircleMarker>
+                  ))}
               </FeatureGroup>
             </LayersControl.Overlay>
           )}
           
-        {northWindPointsTraj && northWindPointsTraj.length > 0 && (
-          <LayersControl.Overlay checked name="North Wind Points (Trajectory)">
-            <FeatureGroup>
-              {northWindPointsTraj.map((pos, idx) => (
-                <Marker key={idx} position={pos} icon={blueTriangleIcon}>
-                  <Tooltip direction="top" opacity={0.9} sticky className="font-sans font-bold text-slate-800 bg-white border-0 shadow-sm rounded-md px-2 py-1">
-                    North Wind Landing (Parachute) (Trajectory)
+          {mnLine && (
+            <LayersControl.Overlay checked name="Magnetic North">
+              <FeatureGroup>
+                <Polyline
+                  positions={mnLine}
+                  pathOptions={{ color: COLORS.magneticNorth, weight: 3, dashArray: "10, 6", opacity: 0.95 }}
+                >
+                  <Tooltip sticky className="font-sans font-bold text-slate-800 bg-white border-0 shadow-sm rounded-md px-2 py-1">
+                    Magnetic north ({formatDeclination(magDec!)})
                   </Tooltip>
-                </Marker>
-              ))}
-            </FeatureGroup>
-          </LayersControl.Overlay>
-        )}
+                </Polyline>
+                {mnLabelIcon && <Marker position={mnLine[1]} icon={mnLabelIcon} interactive={false} />}
+              </FeatureGroup>
+            </LayersControl.Overlay>
+          )}
+
+          {northWindPointsTraj && northWindPointsTraj.length > 0 && (
+            <LayersControl.Overlay checked name="Magnetic-N Wind (Trajectory)">
+              <FeatureGroup>
+                {northWindPointsTraj.map((p, idx) => (
+                  <Marker key={idx} position={toLatLng(p)} icon={northTrajIcon} zIndexOffset={500}>
+                    <Tooltip direction="top" opacity={0.9} className="font-sans font-bold text-slate-800 bg-white border-0 shadow-sm rounded-md px-2 py-1">
+                      Wind from magnetic N, {p.wind_speed.toFixed(1)} m/s (trajectory)
+                    </Tooltip>
+                  </Marker>
+                ))}
+              </FeatureGroup>
+            </LayersControl.Overlay>
+          )}
 
           {northWindPoints && northWindPoints.length > 0 && (
-            <LayersControl.Overlay checked name="North Wind Points (Parachute)">
+            <LayersControl.Overlay checked name="Magnetic-N Wind (Parachute)">
               <FeatureGroup>
-                {northWindPoints.map((pos, idx) => (
-                  <Marker key={idx} position={pos} icon={blackTriangleIcon}>
-                    <Tooltip direction="top" opacity={0.9} sticky className="font-sans font-bold text-slate-800 bg-white border-0 shadow-sm rounded-md px-2 py-1">
-                      North Wind Landing (Parachute)
+                {northWindPoints.map((p, idx) => (
+                  <Marker key={idx} position={toLatLng(p)} icon={northParaIcon} zIndexOffset={500}>
+                    <Tooltip direction="top" opacity={0.9} className="font-sans font-bold text-slate-800 bg-white border-0 shadow-sm rounded-md px-2 py-1">
+                      Wind from magnetic N, {p.wind_speed.toFixed(1)} m/s (parachute)
                     </Tooltip>
                   </Marker>
                 ))}
