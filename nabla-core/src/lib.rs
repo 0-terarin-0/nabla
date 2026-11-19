@@ -22,3 +22,7 @@ pub mod solver;
 /// The `post_process` module handles data export, KML generation, and
 /// dispersion analysis outputs.
 pub mod post_process;
+
+/// The `app` module provides a high-level, I/O-agnostic simulation runner
+/// shared by the GUI (Tauri) and web (nabla-server) backends.
+pub mod app;
