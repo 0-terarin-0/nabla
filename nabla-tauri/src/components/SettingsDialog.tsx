@@ -32,8 +32,8 @@ const PROVIDERS = [
     id: "esri",
     google: false,
     icon: Globe,
-    title: "Esri World Imagery",
-    desc: "Free satellite imagery. No setup needed.",
+    title: "GSI / Esri",
+    desc: "No setup needed.",
   },
   {
     id: "google",

@@ -79,6 +79,38 @@ if (typeof window !== "undefined") {
   });
 }
 
+const GSI_ATTRIBUTION =
+  '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noreferrer">国土地理院</a>';
+
+// Base maps. The first entry is selected by default.
+// GSI tiles allow CORS, so screenshots via html-to-image work.
+const BASE_LAYERS = [
+  {
+    name: "地理院 写真",
+    url: "https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg",
+    attribution: GSI_ATTRIBUTION,
+    maxNativeZoom: 18,
+  },
+  {
+    name: "地理院 標準地図",
+    url: "https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png",
+    attribution: GSI_ATTRIBUTION,
+    maxNativeZoom: 18,
+  },
+  {
+    name: "地理院 淡色地図",
+    url: "https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png",
+    attribution: GSI_ATTRIBUTION,
+    maxNativeZoom: 18,
+  },
+  {
+    name: "Esri World Imagery",
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    attribution: "Tiles &copy; Esri &mdash; Source: Esri",
+    maxNativeZoom: 19,
+  },
+] as const;
+
 function MapBounds({ geoJsonData }: { geoJsonData: FeatureCollection[] }) {
   const map = useMap();
 
@@ -259,14 +291,19 @@ export default function MapViewer({
         className="w-full h-full absolute inset-0"
         zoomControl={true}
       >
-        <TileLayer
-          attribution="Tiles &copy; Esri &mdash; Source: Esri"
-          url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-          maxZoom={19}
-          crossOrigin="anonymous"
-        />
-
         <LayersControl position="topright">
+          {BASE_LAYERS.map((b, idx) => (
+            <LayersControl.BaseLayer key={b.name} name={b.name} checked={idx === 0}>
+              <TileLayer
+                attribution={b.attribution}
+                url={b.url}
+                maxNativeZoom={b.maxNativeZoom}
+                maxZoom={19}
+                crossOrigin="anonymous"
+              />
+            </LayersControl.BaseLayer>
+          ))}
+
           {safetyArea && safetyArea.length > 0 && (
             <LayersControl.Overlay checked name="Safety Area">
               <Polygon
