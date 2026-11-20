@@ -157,7 +157,7 @@ export default function Home() {
     setGoogleApiKey(next.googleApiKey);
     localStorage.setItem("googleApiKey", next.googleApiKey);
     localStorage.setItem("useGoogleMaps", String(next.useGoogleMaps));
-    log(`Settings saved. Map provider: ${next.useGoogleMaps ? "Google Maps" : "Esri"}.`, "success");
+    log(`Settings saved. Map provider: ${next.useGoogleMaps ? "Google Maps" : "GSI (国土地理院)"}.`, "success");
   };
 
   const handleTomlUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
