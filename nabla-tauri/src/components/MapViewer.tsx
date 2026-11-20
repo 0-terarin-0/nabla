@@ -442,7 +442,7 @@ export default function MapViewer({
 
         {launchPos && redDotIcon && (
           <Marker position={launchPos} icon={redDotIcon}>
-             <Tooltip direction="top" offset={[0, -8]} opacity={0.95} permanent className="font-sans font-bold text-slate-800 bg-white border-0 shadow-sm rounded-md px-2 py-1">
+             <Tooltip direction="top" offset={[0, -8]} opacity={0.95} className="font-sans font-bold text-slate-800 bg-white border-0 shadow-sm rounded-md px-2 py-1">
               Launch point
             </Tooltip>
           </Marker>
@@ -450,7 +450,7 @@ export default function MapViewer({
         
         {ignitionPos && blueDotIcon && (
           <Marker position={ignitionPos} icon={blueDotIcon}>
-            <Tooltip direction="top" offset={[0, -8]} opacity={0.95} permanent className="font-sans font-bold text-slate-800 bg-white border-0 shadow-sm rounded-md px-2 py-1">
+            <Tooltip direction="top" offset={[0, -8]} opacity={0.95} className="font-sans font-bold text-slate-800 bg-white border-0 shadow-sm rounded-md px-2 py-1">
               Ignition point
             </Tooltip>
           </Marker>
