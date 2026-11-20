@@ -236,7 +236,13 @@ export default function Home() {
       if (result.total_impulse != null) {
         log(`Thrust curve total impulse: ${result.total_impulse.toFixed(1)} N·s`);
       }
-      if (isLoop && (result.north_wind_points_traj?.length ?? 0) === 0) {
+      if (result.mag_dec === undefined) {
+        // Older nabla-server builds do not return magnetic-north data at all.
+        log(
+          "The simulation server is outdated: magnetic north and north-wind markers are unavailable. Update and restart nabla-server.",
+          "error",
+        );
+      } else if (isLoop && (result.north_wind_points_traj?.length ?? 0) === 0) {
         log(
           "No magnetic-north wind case in the sweep (azimuth 0° not included). Set [Solver] azimuth_min so that 0° is covered.",
           "error",
